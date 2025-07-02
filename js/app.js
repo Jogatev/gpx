@@ -139,11 +139,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         alignPathBtn.disabled = true;
         alignPathBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aligning...';
-        // Snap to road using Mapbox/OSRM
-        await handleRouteDraw(lastDrawnCoords, { forceSnap: true });
-        isSnapped = true;
-        alignPathBtn.disabled = false;
-        alignPathBtn.innerHTML = '<i class="fas fa-route"></i> Align Path to Road';
+        try {
+            await handleRouteDraw(lastDrawnCoords, { forceSnap: true });
+            isSnapped = true;
+        } finally {
+            alignPathBtn.disabled = false;
+            alignPathBtn.innerHTML = '<i class="fas fa-route"></i> Align Path to Road';
+        }
     });
 
     // --- Handle Route Drawing, Snapping, Elevation, and Timestamps ---
