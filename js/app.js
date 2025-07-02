@@ -247,6 +247,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const suggestionsBox = document.getElementById('searchSuggestions');
     let searchResults = [];
     let activeSuggestion = -1;
+    let searchMarker = null;
+
+    // Helper: Clear previous search marker
+    function clearSearchMarker() {
+        if (searchMarker) {
+            map.removeLayer(searchMarker);
+            searchMarker = null;
+        }
+    }
 
     // Fetch suggestions from Mapbox Geocoding API
     async function fetchSuggestions(query) {
@@ -271,29 +280,33 @@ document.addEventListener('DOMContentLoaded', function () {
             div.textContent = feature.place_name;
             div.addEventListener('mousedown', e => {
                 e.preventDefault();
-                selectSuggestion(idx);
+                selectSuggestion(idx, true);
             });
             suggestionsBox.appendChild(div);
         });
         suggestionsBox.style.display = 'block';
     }
 
-    // Select a suggestion
-    function selectSuggestion(idx) {
+    // Select a suggestion or perform a search
+    function selectSuggestion(idx, fromDropdown = false) {
         const feature = searchResults[idx];
         if (!feature) return;
         // Pan/zoom to location
         map.setView([feature.center[1], feature.center[0]], 16);
-        // Optionally add a marker
-        L.marker([feature.center[1], feature.center[0]]).addTo(map);
+        // Remove previous search marker
+        clearSearchMarker();
+        // Place a new marker
+        searchMarker = L.marker([feature.center[1], feature.center[0]]).addTo(map);
         // Hide suggestions
         suggestionsBox.style.display = 'none';
         searchInput.value = feature.place_name;
+        if (fromDropdown) searchInput.blur();
     }
 
     // Handle input events
     searchInput.addEventListener('input', Utils.debounce(async function (e) {
         const query = searchInput.value.trim();
+        clearSearchMarker();
         if (!query) {
             suggestionsBox.style.display = 'none';
             return;
@@ -303,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function () {
         renderSuggestions(searchResults);
     }, 250));
 
-    // Keyboard navigation for suggestions
+    // Keyboard navigation for suggestions and Enter to search
     searchInput.addEventListener('keydown', function (e) {
         if (!searchResults.length) return;
         if (e.key === 'ArrowDown') {
@@ -316,9 +329,15 @@ document.addEventListener('DOMContentLoaded', function () {
             e.preventDefault();
         } else if (e.key === 'Enter') {
             if (activeSuggestion >= 0) {
-                selectSuggestion(activeSuggestion);
+                selectSuggestion(activeSuggestion, true);
                 e.preventDefault();
+            } else if (searchResults.length > 0) {
+                selectSuggestion(0, true);
+                e.preventDefault();
+            } else {
+                Utils.updateStatus('No results found.');
             }
+            suggestionsBox.style.display = 'none';
         } else if (e.key === 'Escape') {
             suggestionsBox.style.display = 'none';
         }
@@ -330,8 +349,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!query) return;
         searchResults = await fetchSuggestions(query);
         if (searchResults.length) {
-            selectSuggestion(0);
+            selectSuggestion(0, true);
+        } else {
+            Utils.updateStatus('No results found.');
         }
+        suggestionsBox.style.display = 'none';
     });
 
     // Hide suggestions when clicking outside
