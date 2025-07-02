@@ -1,0 +1,28 @@
+{
+  "name": "route-generator",
+  "version": "1.0.0",
+  "description": "Interactive Route Generator with GPX Export",
+  "main": "index.html",
+  "scripts": {
+    "start": "http-server -p 8080 -c-1",
+    "dev": "live-server --port=8080"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "leaflet-draw": "^1.0.4",
+    "leaflet-snap": "^0.1.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "live-server": "^1.2.2"
+  },
+  "keywords": [
+    "gpx",
+    "route",
+    "mapping",
+    "leaflet",
+    "fitness"
+  ],
+  "author": "Route Generator",
+  "license": "MIT"
+} 
