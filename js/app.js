@@ -65,20 +65,46 @@ document.addEventListener('DOMContentLoaded', function () {
         layer: null
     };
 
-    // --- Drawing Events ---
+    // --- Drawing Tools: Draw Route (Extendable) ---
+    const drawPolylineBtn = document.getElementById('drawPolyline');
+    let drawPolylineHandler = null;
+
+    if (drawPolylineBtn) {
+        drawPolylineBtn.addEventListener('click', function () {
+            // Activate polyline drawing mode
+            if (drawPolylineHandler) {
+                drawPolylineHandler.disable();
+            }
+            drawPolylineHandler = new L.Draw.Polyline(map, drawControl.options.draw.polyline);
+            drawPolylineHandler.enable();
+        });
+    }
+
+    // --- Drawing Events (Extended) ---
     map.on(L.Draw.Event.CREATED, async function (e) {
         const layer = e.layer;
-        drawnItems.clearLayers();
-        drawnItems.addLayer(layer);
-        if (layer instanceof L.Polyline || layer instanceof L.Polygon) {
-            const coords = layer.getLatLngs();
-            let flatCoords = coords;
-            if (Array.isArray(coords[0])) flatCoords = coords[0];
-            const latlngs = flatCoords.map(ll => [ll.lat, ll.lng]);
+        // If drawing a polyline and a route already exists, extend it
+        if (layer instanceof L.Polyline && currentRoute.coordinates.length > 0) {
+            // Get new segment points
+            let newCoords = layer.getLatLngs();
+            if (Array.isArray(newCoords[0])) newCoords = newCoords[0];
+            const newLatLngs = newCoords.map(ll => [ll.lat, ll.lng]);
+            // Merge with existing route (append to end)
+            const mergedCoords = currentRoute.coordinates.concat(newLatLngs);
+            lastDrawnCoords = mergedCoords;
+            isSnapped = false;
+            alignPathBtn.style.display = 'flex';
+            await handleRouteDraw(mergedCoords, { skipSnap: true });
+        } else if (layer instanceof L.Polyline || layer instanceof L.Polygon) {
+            // Default behavior for new route
+            drawnItems.clearLayers();
+            drawnItems.addLayer(layer);
+            let coords = layer.getLatLngs();
+            if (Array.isArray(coords[0])) coords = coords[0];
+            const latlngs = coords.map(ll => [ll.lat, ll.lng]);
             lastDrawnCoords = latlngs;
             isSnapped = false;
             alignPathBtn.style.display = 'flex';
-            // Don't snap yet, just show the path
             await handleRouteDraw(latlngs, { skipSnap: true });
         }
     });
