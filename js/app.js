@@ -201,17 +201,33 @@ document.addEventListener('DOMContentLoaded', function () {
         return timestamps;
     }
 
-    // --- Update Route Info Panel ---
-    function updateRouteInfo() {
+    // --- Run Details Stats Update ---
+    function updateRunStatsPanel() {
         const dist = Utils.calculateRouteDistance(currentRoute.coordinates);
-        const elevGain = Utils.calculateElevationGain(currentRoute.elevations);
-        const duration = currentRoute.timestamps.length > 1
-            ? (new Date(currentRoute.timestamps.at(-1)) - new Date(currentRoute.timestamps[0])) / 1000
-            : 0;
-        document.getElementById('distance').textContent = Utils.formatDistance(dist);
-        document.getElementById('elevationGain').textContent = Utils.formatElevation(elevGain);
-        document.getElementById('duration').textContent = Utils.formatDuration(duration);
-        document.getElementById('pointCount').textContent = currentRoute.coordinates.length;
+        let pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
+        let duration = dist * pace; // min
+        const paceUnit = document.getElementById('paceUnit')?.value || 'min/km';
+        if (paceUnit === 'min/mi') {
+            pace = pace * 0.621371;
+            duration = dist * 0.621371 * pace;
+        }
+        if (document.getElementById('runStatDistance')) {
+            document.getElementById('runStatDistance').textContent = dist.toFixed(2) + (paceUnit === 'min/km' ? ' km' : ' mi');
+        }
+        if (document.getElementById('runStatDuration')) {
+            document.getElementById('runStatDuration').textContent = Utils.formatDuration(duration * 60);
+        }
+        if (document.getElementById('runStatElevation')) {
+            document.getElementById('runStatElevation').textContent = Utils.formatElevation(Utils.calculateElevationGain(currentRoute.elevations));
+        }
+        if (document.getElementById('runStatPace')) {
+            document.getElementById('runStatPace').textContent = parseFloat(document.getElementById('avgPace')?.value || 5.5).toFixed(2);
+        }
+    }
+
+    // --- Update stats after every route change ---
+    function updateRouteInfo() {
+        updateRunStatsPanel();
     }
 
     // --- Mapbox Geocoding Search with Suggestions ---
@@ -232,7 +248,25 @@ document.addEventListener('DOMContentLoaded', function () {
         return data.features || [];
     }
 
-    // Render suggestions dropdown
+    // Add clear (X) button to search input
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.innerHTML = '<i class="fas fa-times"></i>';
+    clearBtn.className = 'search-clear-btn';
+    clearBtn.style.display = 'none';
+    searchInput.parentNode.insertBefore(clearBtn, searchInput.nextSibling);
+
+    searchInput.addEventListener('input', function () {
+        clearBtn.style.display = searchInput.value ? 'block' : 'none';
+    });
+    clearBtn.addEventListener('click', function () {
+        searchInput.value = '';
+        clearBtn.style.display = 'none';
+        suggestionsBox.style.display = 'none';
+        searchInput.focus();
+    });
+
+    // Enhanced renderSuggestions with icon and type
     function renderSuggestions(suggestions) {
         suggestionsBox.innerHTML = '';
         if (!suggestions.length) {
@@ -242,7 +276,15 @@ document.addEventListener('DOMContentLoaded', function () {
         suggestions.forEach((feature, idx) => {
             const div = document.createElement('div');
             div.className = 'search-suggestion' + (idx === activeSuggestion ? ' active' : '');
-            div.textContent = feature.place_name;
+            // Choose icon based on place type
+            let icon = '<i class="fas fa-map-marker-alt"></i>';
+            if (feature.place_type && feature.place_type[0]) {
+                if (feature.place_type[0] === 'address') icon = '<i class="fas fa-home"></i>';
+                if (feature.place_type[0] === 'poi') icon = '<i class="fas fa-landmark"></i>';
+                if (feature.place_type[0] === 'region') icon = '<i class="fas fa-globe"></i>';
+                if (feature.place_type[0] === 'locality') icon = '<i class="fas fa-city"></i>';
+            }
+            div.innerHTML = `${icon} <span class="search-main">${feature.text}</span><br><span class="search-sub">${feature.place_name}</span>`;
             div.addEventListener('mousedown', e => {
                 e.preventDefault();
                 selectSuggestion(idx);
@@ -265,40 +307,14 @@ document.addEventListener('DOMContentLoaded', function () {
         searchInput.value = feature.place_name;
     }
 
-    // Handle input events
-    searchInput.addEventListener('input', Utils.debounce(async function (e) {
-        const query = searchInput.value.trim();
-        if (!query) {
-            suggestionsBox.style.display = 'none';
-            return;
-        }
-        searchResults = await fetchSuggestions(query);
-        activeSuggestion = -1;
-        renderSuggestions(searchResults);
-    }, 250));
-
-    // Keyboard navigation for suggestions
+    // On Enter or search icon, always go to the top suggestion
     searchInput.addEventListener('keydown', function (e) {
         if (!searchResults.length) return;
-        if (e.key === 'ArrowDown') {
-            activeSuggestion = (activeSuggestion + 1) % searchResults.length;
-            renderSuggestions(searchResults);
+        if (e.key === 'Enter') {
+            selectSuggestion(activeSuggestion >= 0 ? activeSuggestion : 0);
             e.preventDefault();
-        } else if (e.key === 'ArrowUp') {
-            activeSuggestion = (activeSuggestion - 1 + searchResults.length) % searchResults.length;
-            renderSuggestions(searchResults);
-            e.preventDefault();
-        } else if (e.key === 'Enter') {
-            if (activeSuggestion >= 0) {
-                selectSuggestion(activeSuggestion);
-                e.preventDefault();
-            }
-        } else if (e.key === 'Escape') {
-            suggestionsBox.style.display = 'none';
         }
     });
-
-    // Search button click
     searchBtn.addEventListener('click', async function () {
         const query = searchInput.value.trim();
         if (!query) return;
@@ -373,29 +389,6 @@ document.addEventListener('DOMContentLoaded', function () {
             paceInconsistencyValue.textContent = paceInconsistency.value + '%';
         });
     }
-
-    // Update run stats panel with current route
-    function updateRunStatsPanel() {
-        const dist = Utils.calculateRouteDistance(currentRoute.coordinates);
-        let pace = parseFloat(avgPace.value) || 5.5;
-        let duration = dist * pace; // min
-        if (paceUnit.value === 'min/mi') {
-            // Convert km to mi
-            pace = pace * 0.621371;
-            duration = dist * 0.621371 * pace;
-        }
-        runStatDistance.textContent = dist.toFixed(2) + (paceUnit.value === 'min/km' ? ' km' : ' mi');
-        runStatDuration.textContent = Utils.formatDuration(duration * 60);
-        runStatElevation.textContent = Utils.formatElevation(Utils.calculateElevationGain(currentRoute.elevations));
-        runStatPace.textContent = parseFloat(avgPace.value).toFixed(2);
-    }
-
-    // Update stats when route changes
-    const originalUpdateRouteInfo = updateRouteInfo;
-    updateRouteInfo = function() {
-        originalUpdateRouteInfo();
-        updateRunStatsPanel();
-    };
 
     // Sync pace slider with Route Settings pace input
     const paceInput = document.getElementById('pace');
