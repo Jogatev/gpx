@@ -10,8 +10,7 @@
   },
   "dependencies": {
     "leaflet": "^1.9.4",
-    "leaflet-draw": "^1.0.4",
-    "leaflet-snap": "^0.1.0"
+    "leaflet-draw": "^1.0.4"
   },
   "devDependencies": {
     "http-server": "^14.1.1",
