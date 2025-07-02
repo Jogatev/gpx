@@ -65,46 +65,20 @@ document.addEventListener('DOMContentLoaded', function () {
         layer: null
     };
 
-    // --- Drawing Tools: Draw Route (Extendable) ---
-    const drawPolylineBtn = document.getElementById('drawPolyline');
-    let drawPolylineHandler = null;
-
-    if (drawPolylineBtn) {
-        drawPolylineBtn.addEventListener('click', function () {
-            // Activate polyline drawing mode
-            if (drawPolylineHandler) {
-                drawPolylineHandler.disable();
-            }
-            drawPolylineHandler = new L.Draw.Polyline(map, drawControl.options.draw.polyline);
-            drawPolylineHandler.enable();
-        });
-    }
-
-    // --- Drawing Events (Extended) ---
+    // --- Drawing Events ---
     map.on(L.Draw.Event.CREATED, async function (e) {
         const layer = e.layer;
-        // If drawing a polyline and a route already exists, extend it
-        if (layer instanceof L.Polyline && currentRoute.coordinates.length > 0) {
-            // Get new segment points
-            let newCoords = layer.getLatLngs();
-            if (Array.isArray(newCoords[0])) newCoords = newCoords[0];
-            const newLatLngs = newCoords.map(ll => [ll.lat, ll.lng]);
-            // Merge with existing route (append to end)
-            const mergedCoords = currentRoute.coordinates.concat(newLatLngs);
-            lastDrawnCoords = mergedCoords;
-            isSnapped = false;
-            alignPathBtn.style.display = 'flex';
-            await handleRouteDraw(mergedCoords, { skipSnap: true });
-        } else if (layer instanceof L.Polyline || layer instanceof L.Polygon) {
-            // Default behavior for new route
-            drawnItems.clearLayers();
-            drawnItems.addLayer(layer);
-            let coords = layer.getLatLngs();
-            if (Array.isArray(coords[0])) coords = coords[0];
-            const latlngs = coords.map(ll => [ll.lat, ll.lng]);
+        drawnItems.clearLayers();
+        drawnItems.addLayer(layer);
+        if (layer instanceof L.Polyline || layer instanceof L.Polygon) {
+            const coords = layer.getLatLngs();
+            let flatCoords = coords;
+            if (Array.isArray(coords[0])) flatCoords = coords[0];
+            const latlngs = flatCoords.map(ll => [ll.lat, ll.lng]);
             lastDrawnCoords = latlngs;
             isSnapped = false;
             alignPathBtn.style.display = 'flex';
+            // Don't snap yet, just show the path
             await handleRouteDraw(latlngs, { skipSnap: true });
         }
     });
@@ -247,15 +221,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const suggestionsBox = document.getElementById('searchSuggestions');
     let searchResults = [];
     let activeSuggestion = -1;
-    let searchMarker = null;
-
-    // Helper: Clear previous search marker
-    function clearSearchMarker() {
-        if (searchMarker) {
-            map.removeLayer(searchMarker);
-            searchMarker = null;
-        }
-    }
 
     // Fetch suggestions from Mapbox Geocoding API
     async function fetchSuggestions(query) {
@@ -280,33 +245,29 @@ document.addEventListener('DOMContentLoaded', function () {
             div.textContent = feature.place_name;
             div.addEventListener('mousedown', e => {
                 e.preventDefault();
-                selectSuggestion(idx, true);
+                selectSuggestion(idx);
             });
             suggestionsBox.appendChild(div);
         });
         suggestionsBox.style.display = 'block';
     }
 
-    // Select a suggestion or perform a search
-    function selectSuggestion(idx, fromDropdown = false) {
+    // Select a suggestion
+    function selectSuggestion(idx) {
         const feature = searchResults[idx];
         if (!feature) return;
         // Pan/zoom to location
         map.setView([feature.center[1], feature.center[0]], 16);
-        // Remove previous search marker
-        clearSearchMarker();
-        // Place a new marker
-        searchMarker = L.marker([feature.center[1], feature.center[0]]).addTo(map);
+        // Optionally add a marker
+        L.marker([feature.center[1], feature.center[0]]).addTo(map);
         // Hide suggestions
         suggestionsBox.style.display = 'none';
         searchInput.value = feature.place_name;
-        if (fromDropdown) searchInput.blur();
     }
 
     // Handle input events
     searchInput.addEventListener('input', Utils.debounce(async function (e) {
         const query = searchInput.value.trim();
-        clearSearchMarker();
         if (!query) {
             suggestionsBox.style.display = 'none';
             return;
@@ -316,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function () {
         renderSuggestions(searchResults);
     }, 250));
 
-    // Keyboard navigation for suggestions and Enter to search
+    // Keyboard navigation for suggestions
     searchInput.addEventListener('keydown', function (e) {
         if (!searchResults.length) return;
         if (e.key === 'ArrowDown') {
@@ -329,15 +290,9 @@ document.addEventListener('DOMContentLoaded', function () {
             e.preventDefault();
         } else if (e.key === 'Enter') {
             if (activeSuggestion >= 0) {
-                selectSuggestion(activeSuggestion, true);
+                selectSuggestion(activeSuggestion);
                 e.preventDefault();
-            } else if (searchResults.length > 0) {
-                selectSuggestion(0, true);
-                e.preventDefault();
-            } else {
-                Utils.updateStatus('No results found.');
             }
-            suggestionsBox.style.display = 'none';
         } else if (e.key === 'Escape') {
             suggestionsBox.style.display = 'none';
         }
@@ -349,11 +304,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!query) return;
         searchResults = await fetchSuggestions(query);
         if (searchResults.length) {
-            selectSuggestion(0, true);
-        } else {
-            Utils.updateStatus('No results found.');
+            selectSuggestion(0);
         }
-        suggestionsBox.style.display = 'none';
     });
 
     // Hide suggestions when clicking outside
