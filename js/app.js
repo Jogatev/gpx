@@ -326,11 +326,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         suggestionsBox.style.display = 'block';
         // Auto-scroll to keep active suggestion in view
-        setTimeout(() => {
-            const active = suggestionsBox.querySelector('.search-suggestion.active');
-            if (active) active.scrollIntoView({ block: 'nearest' });
-        }, 0);
-    });
+    }
 
     // Keyboard navigation for suggestions (improved)
     searchInput.addEventListener('keydown', function (e) {
