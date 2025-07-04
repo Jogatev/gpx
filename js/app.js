@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Apply loops if enabled
         if (loopRoute && loopRoute.checked) {
-            updateRouteWithLoops();
+            await updateRouteWithLoops();
         } else {
             updateRouteInfo();
         }
@@ -330,7 +330,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const active = suggestionsBox.querySelector('.search-suggestion.active');
             if (active) active.scrollIntoView({ block: 'nearest' });
         }, 0);
-    }
+    });
 
     // Keyboard navigation for suggestions (improved)
     searchInput.addEventListener('keydown', function (e) {
@@ -480,76 +480,66 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Function to update route with loops
-    function updateRouteWithLoops() {
+    async function updateRouteWithLoops() {
         if (!currentRoute.coordinates.length) return;
         
         const shouldLoop = loopRoute.checked;
         const numLoops = shouldLoop ? parseInt(loopCount.value) || 1 : 1;
-        
-        async function processAndDrawLoopedRoute() {
-            let backtrackedCoords;
-            if (shouldLoop && numLoops > 1) {
-                // Create backtracking coordinates
-                const originalCoords = [...currentRoute.coordinates];
-                backtrackedCoords = [];
-                for (let i = 0; i < numLoops; i++) {
-                    if (i > 0) {
-                        // Add a small gap between loops (optional)
-                        const lastCoord = backtrackedCoords[backtrackedCoords.length - 1];
-                        const firstCoord = originalCoords[0];
-                        const gapCoords = createGapCoords(lastCoord, firstCoord, 50); // 50m gap
-                        backtrackedCoords.push(...gapCoords);
-                    }
-                    if (i % 2 === 0) {
-                        // Forward direction
-                        backtrackedCoords.push(...originalCoords);
-                    } else {
-                        // Backward direction (reverse the coordinates)
-                        backtrackedCoords.push(...originalCoords.slice().reverse());
-                    }
+
+        let backtrackedCoords;
+        if (shouldLoop && numLoops > 1) {
+            // Create backtracking coordinates from already-snapped route
+            const originalCoords = [...currentRoute.coordinates];
+            backtrackedCoords = [];
+            for (let i = 0; i < numLoops; i++) {
+                if (i > 0) {
+                    // Add a small gap between loops (optional)
+                    const lastCoord = backtrackedCoords[backtrackedCoords.length - 1];
+                    const firstCoord = originalCoords[0];
+                    const gapCoords = createGapCoords(lastCoord, firstCoord, 50); // 50m gap
+                    backtrackedCoords.push(...gapCoords);
                 }
-            } else {
-                // Reset to original route
-                backtrackedCoords = currentRoute.coordinates.slice(0, Math.ceil(currentRoute.coordinates.length / (parseInt(loopCount.value) || 1)));
+                if (i % 2 === 0) {
+                    // Forward direction
+                    backtrackedCoords.push(...originalCoords);
+                } else {
+                    // Backward direction (reverse the coordinates)
+                    backtrackedCoords.push(...originalCoords.slice().reverse());
+                }
             }
-
-            // Snap the final looped route to roads/paths (walking)
-            let snappedCoords = backtrackedCoords;
-            if (window.RouteSnappingService) {
-                snappedCoords = await window.RouteSnappingService.snapToRoads(backtrackedCoords, { profile: 'walking' });
-            }
-
-            // Update current route with snapped, looped coordinates
-            const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
-            const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
-            const timestamps = generateTimestamps(snappedCoords, pace, startTime);
-
-            // Get elevation data for snapped, looped route
-            let elevations = [];
-            if (window.ElevationService) {
-                elevations = await window.ElevationService.getElevationData(snappedCoords);
-            }
-
-            // Update the route layer
-            drawnItems.clearLayers();
-            const poly = L.polyline(snappedCoords, { 
-                color: isSnapped ? '#3498db' : '#e67e22', 
-                weight: 5 
-            });
-            drawnItems.addLayer(poly);
-
-            // Update current route state
-            currentRoute = {
-                coordinates: snappedCoords,
-                elevations: elevations,
-                timestamps: timestamps,
-                layer: poly
-            };
-
-            updateRouteInfo();
+        } else {
+            // Reset to original route
+            backtrackedCoords = currentRoute.coordinates.slice(0, Math.ceil(currentRoute.coordinates.length / (parseInt(loopCount.value) || 1)));
         }
-        // Call the async function
-        processAndDrawLoopedRoute();
+
+        // Do NOT snap the looped route again! Just use the backtracked coordinates
+        const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
+        const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
+        const timestamps = generateTimestamps(backtrackedCoords, pace, startTime);
+
+        // Get elevation data for the looped route
+        let elevations = [];
+        if (window.ElevationService) {
+            elevations = await window.ElevationService.getElevationData(backtrackedCoords);
+        }
+
+        // Update the route layer
+        drawnItems.clearLayers();
+        const poly = L.polyline(backtrackedCoords, { 
+            color: isSnapped ? '#3498db' : '#e67e22', 
+            weight: 5 
+        });
+        drawnItems.addLayer(poly);
+
+        // Update current route state
+        currentRoute = {
+            coordinates: backtrackedCoords,
+            elevations: elevations,
+            timestamps: timestamps,
+            layer: poly
+        };
+
+        updateRouteInfo();
     }
 
     // Helper function to create gap coordinates between loops
