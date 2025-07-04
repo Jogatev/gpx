@@ -155,6 +155,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if ((options.forceSnap || (!options.skipSnap && !isSnapped)) && window.RouteSnappingService) {
             // Use walking profile by default for best path coverage
             snappedCoords = await window.RouteSnappingService.snapToRoads(coords, { profile: 'walking' });
+            isSnapped = true;
+        } else if (options.skipSnap) {
+            isSnapped = false;
         }
         // Get elevation data
         let elevations = [];
@@ -478,6 +481,12 @@ document.addEventListener('DOMContentLoaded', function () {
     // Function to update route with loops
     async function updateRouteWithLoops() {
         if (!currentRoute.coordinates.length) return;
+        // If the route is not snapped, snap it first before looping
+        if (!isSnapped && window.RouteSnappingService) {
+            const snapped = await window.RouteSnappingService.snapToRoads(currentRoute.coordinates, { profile: 'walking' });
+            currentRoute.coordinates = snapped;
+            isSnapped = true;
+        }
         
         const shouldLoop = loopRoute.checked;
         const numLoops = shouldLoop ? parseInt(loopCount.value) || 1 : 1;
