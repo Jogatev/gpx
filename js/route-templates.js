@@ -1,12 +1,9 @@
-/**
- * Route Templates & Presets
- * Pre-built routes and configurations for popular running areas
- */
+
 
 class RouteTemplates {
     constructor() {
         this.templates = {
-            // Popular running routes
+            
             'golden-gate-park': {
                 name: 'Golden Gate Park Loop',
                 description: 'Scenic loop through San Francisco\'s famous park',
@@ -76,42 +73,34 @@ class RouteTemplates {
         };
     }
 
-    /**
-     * Get all available templates
-     */
+    
     getAllTemplates() {
         return this.templates;
     }
 
-    /**
-     * Get template by name
-     */
+    
     getTemplate(name) {
         return this.templates[name];
     }
 
-    /**
-     * Get all loop types
-     */
+    
     getLoopTypes() {
         return this.loopTypes;
     }
 
-    /**
-     * Apply template to map
-     */
+    
     async applyTemplate(templateName, map) {
         const template = this.getTemplate(templateName);
         if (!template) {
             throw new Error(`Template '${templateName}' not found`);
         }
 
-        // Clear existing routes
+        
         if (window.routeMap && window.routeMap.drawnItems) {
             window.routeMap.drawnItems.clearLayers();
         }
 
-        // Draw the template route
+        
         const poly = L.polyline(template.coordinates, { 
             color: '#e67e22', 
             weight: 5 
@@ -121,7 +110,7 @@ class RouteTemplates {
             window.routeMap.drawnItems.addLayer(poly);
         }
 
-        // Fit map to route
+        
         if (map) {
             map.fitBounds(poly.getBounds());
         }
@@ -129,9 +118,7 @@ class RouteTemplates {
         return template;
     }
 
-    /**
-     * Create custom template
-     */
+    
     createCustomTemplate(name, coordinates, options = {}) {
         const template = {
             name: name,
@@ -147,38 +134,32 @@ class RouteTemplates {
         return template;
     }
 
-    /**
-     * Save template to localStorage
-     */
+    
     saveTemplate(template) {
         const savedTemplates = JSON.parse(localStorage.getItem('savedTemplates') || '{}');
         savedTemplates[template.name] = template;
         localStorage.setItem('savedTemplates', JSON.stringify(savedTemplates));
     }
 
-    /**
-     * Load templates from localStorage
-     */
+    
     loadSavedTemplates() {
         const savedTemplates = JSON.parse(localStorage.getItem('savedTemplates') || '{}');
         return savedTemplates;
     }
 
-    /**
-     * Generate repeated laps route (true lap behavior)
-     */
+    
     generateLapsRoute(baseCoordinates, options = {}) {
         const { numLoops = 1, gapDistance = 50 } = options;
         let route = [];
         for (let i = 0; i < numLoops; i++) {
             if (i > 0 && gapDistance > 0) {
-                // Add a gap between laps
+                
                 const lastCoord = route[route.length - 1];
                 const firstCoord = (i % 2 === 0) ? baseCoordinates[0] : baseCoordinates[baseCoordinates.length - 1];
                 const gapCoords = this.createGapCoords(lastCoord, firstCoord, gapDistance);
                 route.push(...gapCoords);
             }
-            // Alternate between route and reversed route
+            
             if (i % 2 === 0) {
                 route.push(...baseCoordinates);
             } else {
@@ -188,26 +169,20 @@ class RouteTemplates {
         return route;
     }
 
-    /**
-     * Generate route based on lap type (all types use laps logic)
-     */
+    
     generateLoopRoute(baseCoordinates, loopType, options = {}) {
-        // All lap types now use repeated laps logic
+        
         return this.generateLapsRoute(baseCoordinates, options);
     }
 
-    /**
-     * Calculate center of coordinates
-     */
+    
     calculateCenter(coordinates) {
         const sumLat = coordinates.reduce((sum, coord) => sum + coord[0], 0);
         const sumLng = coordinates.reduce((sum, coord) => sum + coord[1], 0);
         return [sumLat / coordinates.length, sumLng / coordinates.length];
     }
 
-    /**
-     * Create gap coordinates between two points
-     */
+    
     createGapCoords(startCoord, endCoord, gapDistance) {
         const gapCoords = [];
         const steps = 3;
@@ -222,9 +197,7 @@ class RouteTemplates {
         return gapCoords;
     }
 
-    /**
-     * Interpolate path between two points
-     */
+    
     interpolatePath(start, end, points = 5) {
         const path = [];
         for (let i = 0; i <= points; i++) {
@@ -237,5 +210,5 @@ class RouteTemplates {
     }
 }
 
-// Create global instance
+
 window.RouteTemplates = new RouteTemplates(); 

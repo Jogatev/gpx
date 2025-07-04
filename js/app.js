@@ -1,8 +1,3 @@
-/**
- * GPX Route Generator - Main Application
- * Advanced running route creator with smart snapping and modern UI
- */
-
 class GPXRouteGenerator {
     constructor() {
         this.map = null;
@@ -11,9 +6,7 @@ class GPXRouteGenerator {
         this.snappedRoute = null;
         this.isDrawing = false;
         this.currentPolyline = null;
-        this.mode = 'draw'; // 'draw', 'pan', 'measure'
-        
-        // Initialize the application
+        this.mode = 'draw'; 
         this.init();
     }
 
@@ -30,32 +23,40 @@ class GPXRouteGenerator {
     }
 
     async initializeMap() {
-        // Initialize map with Mapbox tiles
+        let center = [14.5547, 121.0244]; 
+        let zoom = 13;
+        if (navigator.geolocation) {
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
+                });
+                center = [pos.coords.latitude, pos.coords.longitude];
+                zoom = 15;
+            } catch (e) {
+               
+            }
+        }
         this.map = L.map('map', {
-            center: [37.7749, -122.4194], // San Francisco
-        zoom: 13,
-        zoomControl: true,
-        attributionControl: true
-    });
-
-        // Add Mapbox tiles
+            center,
+            zoom,
+            zoomControl: true,
+            attributionControl: true
+        });
+        if (!window.MAPBOX_TOKEN) {
+            console.error('Mapbox token is not set. Please set window.MAPBOX_TOKEN before loading the map.');
+        }
         L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token={accessToken}', {
-            accessToken: window.MAPBOX_TOKEN || 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw',
+            accessToken: window.MAPBOX_TOKEN,
             maxZoom: 18,
             attribution: '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a>'
         }).addTo(this.map);
-
-        // Initialize drawn items layer
         this.drawnItems = new L.FeatureGroup();
         this.map.addLayer(this.drawnItems);
-
-        // Setup drawing events
         this.map.on('click', (e) => this.handleMapClick(e));
         this.map.on('mousemove', (e) => this.handleMouseMove(e));
     }
 
     setupEventListeners() {
-        // Helper function to safely add event listeners
         const addEventListener = (id, event, handler) => {
             const element = document.getElementById(id);
             if (element) {
@@ -65,43 +66,35 @@ class GPXRouteGenerator {
             }
         };
 
-        // Quick Actions
         addEventListener('clearRoute', 'click', () => this.clearRoute());
         addEventListener('undoLast', 'click', () => this.undoLastPoint());
         addEventListener('fitToRoute', 'click', () => this.fitToRoute());
 
-        // Template Actions
         addEventListener('applyTemplate', 'click', () => this.applySelectedTemplate());
 
-        // Lap Configuration
         addEventListener('createLoop', 'click', () => this.createLoop());
-        // Live update stats on lap controls change
+        
         ['numLoops', 'loopType', 'gapDistance'].forEach(id => {
             addEventListener(id, 'input', () => this.previewLapStats());
         });
 
-        // Snapping Options
         addEventListener('snapRoute', 'click', () => this.snapRoute());
         addEventListener('autoSnap', 'change', (e) => {
             this.autoSnap = e.target.checked;
         });
 
-        // Export Options
         addEventListener('exportGPX', 'click', () => this.exportGPX());
         addEventListener('exportKML', 'click', () => this.exportKML());
         addEventListener('exportJSON', 'click', () => this.exportJSON());
 
-        // Map Controls
         addEventListener('drawMode', 'click', () => this.setMode('draw'));
         addEventListener('panMode', 'click', () => this.setMode('pan'));
         addEventListener('measureMode', 'click', () => this.setMode('measure'));
 
-        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
     }
 
     setupUI() {
-        // Set default values (only if elements exist)
         const runDateElement = document.getElementById('runDate');
         const runStartTimeElement = document.getElementById('runStartTime');
         const autoSnapElement = document.getElementById('autoSnap');
@@ -114,10 +107,8 @@ class GPXRouteGenerator {
             runStartTimeElement.value = new Date().toTimeString().slice(0, 5);
         }
         
-        // Initialize auto-snap
         this.autoSnap = autoSnapElement ? autoSnapElement.checked : true;
         
-        // Update status
         this.updateStatus('Ready to draw your route');
     }
 
@@ -144,7 +135,6 @@ class GPXRouteGenerator {
     addPoint(latlng) {
         this.currentRoute.push([latlng.lat, latlng.lng]);
         
-        // Update polyline
         if (this.currentPolyline) {
             this.map.removeLayer(this.currentPolyline);
         }
@@ -223,10 +213,8 @@ class GPXRouteGenerator {
             this.showLoading('Applying template...');
             const template = await window.RouteTemplates.applyTemplate(templateName, this.map);
             
-            // Set the current route to template coordinates
             this.currentRoute = template.coordinates;
             
-            // Draw the route
             if (this.currentPolyline) {
                 this.map.removeLayer(this.currentPolyline);
             }
@@ -271,18 +259,15 @@ class GPXRouteGenerator {
             const numLoops = parseInt(numLoopsElement.value);
             const gapDistance = parseInt(gapDistanceElement.value);
             
-            // Generate the full looped route
             const loopedRoute = window.RouteTemplates.generateLoopRoute(
                 this.currentRoute, 
                 loopType, 
                 { numLoops, gapDistance }
             );
             
-            // Update the current route to the full looped route
             this.currentRoute = loopedRoute;
-            this.snappedRoute = null; // Clear snappedRoute so stats use the looped route
+            this.snappedRoute = null;
             
-            // Update the polyline
             if (this.currentPolyline) {
                 this.map.removeLayer(this.currentPolyline);
             }
@@ -317,8 +302,8 @@ class GPXRouteGenerator {
             const snapModeElement = document.getElementById('snapMode');
             if (!snapModeElement) {
                 this.showToast('Snap mode selector not found', 'error');
-                return;
-            }
+            return;
+        }
             
             const snapMode = snapModeElement.value;
             const snappedCoordinates = await window.RouteSnapping.snapRoute(
@@ -327,20 +312,16 @@ class GPXRouteGenerator {
             );
             
             if (snappedCoordinates && snappedCoordinates.length > 0) {
-                // Update snappedRoute to the full snapped route
                 this.snappedRoute = snappedCoordinates;
                 
-                // Clear existing snapped route
                 this.drawnItems.clearLayers();
                 
-                // Draw snapped route
                 const snappedPolyline = L.polyline(snappedCoordinates, {
                     color: '#27ae60',
                     weight: 6,
                     opacity: 0.9
                 }).addTo(this.drawnItems);
                 
-                // Add markers for start and end points
                 const startMarker = L.marker(snappedCoordinates[0], {
                     icon: L.divIcon({
                         className: 'start-marker',
@@ -381,7 +362,6 @@ class GPXRouteGenerator {
             modeButton.classList.add('active');
         }
         
-        // Update map behavior
         if (mode === 'pan') {
             this.map.dragging.enable();
             this.map.doubleClickZoom.enable();
@@ -637,13 +617,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sidebar && toggleBtn) {
         toggleBtn.addEventListener('click', () => {
             const collapsed = sidebar.classList.toggle('sidebar-collapsed');
-            // Change icon direction
+            if (window.routeGenerator && window.routeGenerator.map) {
+                window.routeGenerator.map.invalidateSize();
+            }
             if (toggleIcon) {
                 toggleIcon.className = collapsed ? 'fas fa-angle-right' : 'fas fa-angle-left';
             }
-            // Update aria-label
+            
             toggleBtn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-            // Keep focus on button
+            
             toggleBtn.focus();
         });
     }

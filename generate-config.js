@@ -1,6 +1,8 @@
 const fs = require('fs');
-const token = process.env.MAPBOX_TOKEN;
-if (!token) {
-  throw new Error('MAPBOX_TOKEN environment variable is not set!');
-}
-fs.writeFileSync('config.js', `window.MAPBOX_TOKEN = "${token}";\n`); 
+
+const mapboxToken = process.env.MAPBOX_TOKEN || '';
+
+const configContent = `window.MAPBOX_TOKEN = "${mapboxToken}";\n`;
+
+fs.writeFileSync('config.js', configContent);
+console.log('config.js generated with MAPBOX_TOKEN'); 

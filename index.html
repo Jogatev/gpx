@@ -5,60 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GPX Route Generator - Advanced Running Route Creator</title>
     
-    <!-- Favicon -->
+    
     <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
     
-    <!-- Leaflet CSS -->
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <!-- Font Awesome for icons -->
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Custom CSS -->
+    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-content">
+        
+        <header class="header">
+            <div class="header-content">
             <h1><i class="fas fa-route"></i> GPX Route Generator</h1>
             <p class="subtitle">Advanced Running Route Creator with Smart Snapping</p>
-        </div>
-    </header>
+            </div>
+        </header>
 
-    <!-- Main Container -->
+    
     <div class="main-container">
-        <!-- Sidebar -->
+            
         <aside class="sidebar" id="sidebar">
             <button id="toggleSidebar" class="sidebar-toggle-btn" aria-label="Toggle sidebar" tabindex="0">
                 <i class="fas fa-angle-left"></i>
             </button>
-            <!-- Quick Actions -->
-            <div class="sidebar-section">
+            
+                <div class="sidebar-section">
                 <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
                 <div class="button-group">
                     <button id="clearRoute" class="btn btn-secondary">
                         <i class="fas fa-trash"></i> Clear Route
-                    </button>
+                        </button>
                     <button id="undoLast" class="btn btn-secondary">
                         <i class="fas fa-undo"></i> Undo Last
-                    </button>
+                        </button>
                     <button id="fitToRoute" class="btn btn-secondary">
                         <i class="fas fa-expand"></i> Fit to Route
                     </button>
                 </div>
-            </div>
+                </div>
 
-            <!-- Run Details -->
-            <div class="sidebar-section" id="runDetailsSection">
-                <h3><i class="fas fa-running"></i> Run Details</h3>
+            
+                <div class="sidebar-section" id="runDetailsSection">
+                    <h3><i class="fas fa-running"></i> Run Details</h3>
                 <div class="form-group">
                     <label for="paceUnit">Pace Unit</label>
                     <select id="paceUnit" class="form-select">
-                        <option value="min/km">min/km</option>
-                        <option value="min/mi">min/mi</option>
-                    </select>
-                </div>
+                            <option value="min/km">min/km</option>
+                            <option value="min/mi">min/mi</option>
+                        </select>
+                    </div>
                 <div class="form-group">
                     <label for="avgPace">Average Pace (min/km)</label>
                     <div style="display: flex; align-items: center; gap: 1em;">
@@ -95,7 +95,7 @@
                 </div>
             </div>
 
-            <!-- Route Templates -->
+            
             <div class="sidebar-section">
                 <h3><i class="fas fa-map-marked-alt"></i> Route Templates</h3>
                 <div class="template-selector">
@@ -111,7 +111,7 @@
                 </div>
             </div>
 
-            <!-- Lap Configuration -->
+            
             <div class="sidebar-section">
                 <h3><i class="fas fa-redo"></i> Lap Settings</h3>
                 <div class="form-group">
@@ -136,7 +136,7 @@
                 </button>
             </div>
 
-            <!-- Snapping Options -->
+            
             <div class="sidebar-section">
                 <h3><i class="fas fa-magnet"></i> Snapping Options</h3>
                 <div class="form-group">
@@ -146,20 +146,20 @@
                         <option value="cycling">🚴 Cycling</option>
                         <option value="driving">🚗 Driving</option>
                     </select>
-                </div>
+                    </div>
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" id="autoSnap" checked>
                         <span class="checkmark"></span>
                         Auto-snap to roads
                     </label>
-                </div>
+                    </div>
                 <button id="snapRoute" class="btn btn-info">
                     <i class="fas fa-magnet"></i> Snap Route
                 </button>
-            </div>
+                    </div>
 
-            <!-- Route Statistics -->
+            
             <div class="sidebar-section">
                 <h3><i class="fas fa-chart-line"></i> Route Statistics</h3>
                 <div class="stats-grid">
@@ -182,36 +182,36 @@
                 </div>
             </div>
 
-            <!-- Export Options -->
-            <div class="sidebar-section">
-                <h3><i class="fas fa-download"></i> Export</h3>
+            
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-download"></i> Export</h3>
                 <div class="button-group">
                     <button id="exportGPX" class="btn btn-primary">
-                        <i class="fas fa-file-code"></i> Export GPX
-                    </button>
+                            <i class="fas fa-file-code"></i> Export GPX
+                        </button>
                     <button id="exportKML" class="btn btn-warning">
                         <i class="fas fa-file-code"></i> Export KML
-                    </button>
+                        </button>
                     <button id="exportJSON" class="btn btn-info">
                         <i class="fas fa-file-code"></i> Export JSON
-                    </button>
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </aside>
+            </aside>
 
-        <!-- Map Container -->
-        <main class="map-container">
-            <div id="map"></div>
             
-            <!-- Shape/Draw Mode Buttons -->
+            <main class="map-container">
+                <div id="map"></div>
+            
+            
             <div class="draw-modes" style="display: flex; gap: 1em; margin: 1em 0 0 1em;">
                 <button id="drawShape" class="draw-mode-btn active">Draw</button>
                 <button id="drawHeart" class="draw-mode-btn">Heart</button>
                 <button id="drawCircle" class="draw-mode-btn">Circle</button>
             </div>
-            
-            <!-- Map Controls Overlay -->
-            <div class="map-controls">
+                
+                
+                <div class="map-controls">
                 <div class="control-group">
                     <button id="drawMode" class="control-btn active" title="Draw Mode">
                         <i class="fas fa-pencil-alt"></i>
@@ -223,9 +223,9 @@
                         <i class="fas fa-ruler"></i>
                     </button>
                 </div>
-            </div>
+        </div>
 
-            <!-- Status Bar -->
+        
             <div class="status-bar">
                 <span id="statusMessage">Ready to draw your route</span>
                 <span id="coordinates" class="coordinates-display"></span>
@@ -233,7 +233,7 @@
         </main>
     </div>
 
-    <!-- Data Visualization -->
+    
     <section class="data-visualization" style="margin: 2em;">
         <h2>Data Visualization</h2>
         <div class="data-graphs">
@@ -250,7 +250,7 @@
         </div>
     </section>
 
-    <!-- Loading Overlay -->
+    
     <div id="loadingOverlay" class="loading-overlay hidden">
         <div class="loading-content">
             <div class="spinner"></div>
@@ -258,10 +258,11 @@
         </div>
     </div>
 
-    <!-- Toast Notifications -->
+    
     <div id="toastContainer" class="toast-container"></div>
-
-    <!-- Scripts -->
+    
+    
+    <script src="config.js"></script>
     <script>
       window.MAPBOX_TOKEN = 'pk.eyJ1Ijoiam9nYXRldiIsImEiOiJjbWNsajl1MWgwY2ZsMm1vbTN6enJnZ245In0.Us4E9e5nunbG0G0JbQI1Bw';
     </script>

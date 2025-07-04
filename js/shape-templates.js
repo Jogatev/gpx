@@ -1,25 +1,16 @@
-/**
- * Shape Templates Module
- * Provides shape templates as arrays of coordinates
- */
+
 
 class ShapeTemplates {
-    /**
-     * Generate a heart shape
-     * @param {Array} center - [lat, lng]
-     * @param {number} radius - in meters
-     * @param {number} points - number of points
-     * @returns {Array} Array of [lat, lng]
-     */
+    
     static heart(center, radius = 500, points = 100) {
         const coords = [];
         const [lat0, lng0] = center;
         for (let i = 0; i < points; i++) {
             const t = Math.PI * 2 * (i / points);
-            // Heart parametric equation
+            
             const x = 16 * Math.pow(Math.sin(t), 3);
             const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
-            // Scale and convert to lat/lng
+            
             const lat = lat0 + (y * radius * 0.00000899);
             const lng = lng0 + (x * radius * 0.00001141);
             coords.push([lat, lng]);
@@ -27,13 +18,7 @@ class ShapeTemplates {
         return coords;
     }
 
-    /**
-     * Generate a circle shape
-     * @param {Array} center - [lat, lng]
-     * @param {number} radius - in meters
-     * @param {number} points - number of points
-     * @returns {Array} Array of [lat, lng]
-     */
+    
     static circle(center, radius = 500, points = 100) {
         const coords = [];
         const [lat0, lng0] = center;
@@ -46,13 +31,7 @@ class ShapeTemplates {
         return coords;
     }
 
-    /**
-     * Generate a star shape
-     * @param {Array} center - [lat, lng]
-     * @param {number} radius - in meters
-     * @param {number} points - number of star points
-     * @returns {Array} Array of [lat, lng]
-     */
+    
     static star(center, radius = 500, points = 5) {
         const coords = [];
         const [lat0, lng0] = center;
@@ -64,16 +43,11 @@ class ShapeTemplates {
             const lng = lng0 + (r * Math.sin(angle) * 0.00001141);
             coords.push([lat, lng]);
         }
-        coords.push(coords[0]); // Close the star
+        coords.push(coords[0]); 
         return coords;
     }
 
-    /**
-     * Generate a square shape
-     * @param {Array} center - [lat, lng]
-     * @param {number} radius - in meters (half side length)
-     * @returns {Array} Array of [lat, lng]
-     */
+    
     static square(center, radius = 500) {
         const [lat0, lng0] = center;
         const dLat = radius * 0.00000899;
@@ -83,7 +57,7 @@ class ShapeTemplates {
             [lat0 - dLat, lng0 + dLng],
             [lat0 + dLat, lng0 + dLng],
             [lat0 + dLat, lng0 - dLng],
-            [lat0 - dLat, lng0 - dLng], // Close the square
+            [lat0 - dLat, lng0 - dLng], 
         ];
     }
 }
