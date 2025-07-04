@@ -1,3 +1,5 @@
+window.snappedRoute = [];
+
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize the map
     const map = L.map('map', {
@@ -159,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else if (options.skipSnap) {
             isSnapped = false;
         }
-        let snappedRoute = snappedCoords;
+        window.snappedRoute = snappedCoords;
         // Get elevation data
         let elevations = [];
         if (window.ElevationService) {
@@ -238,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Update stats after every route change ---
     function updateRouteInfo() {
+        console.log('updateRouteInfo called. Current route:', currentRoute);
         updateRunStatsPanel();
     }
 
@@ -477,22 +480,29 @@ document.addEventListener('DOMContentLoaded', function () {
                 updateRouteWithLoops();
             }
         });
+        // Also update on input for immediate feedback
+        loopCount.addEventListener('input', function() {
+            if (currentRoute.coordinates.length && loopRoute.checked) {
+                updateRouteWithLoops();
+            }
+        });
     }
 
     // Function to update route with loops
     async function updateRouteWithLoops() {
-        if (!snappedRoute.length) return;
+        console.log('updateRouteWithLoops called. Loops:', loopRoute.checked ? parseInt(loopCount.value) || 1 : 1);
+        if (!window.snappedRoute.length) return;
         const shouldLoop = loopRoute.checked;
         const numLoops = shouldLoop ? parseInt(loopCount.value) || 1 : 1;
 
         let loopedCoords = [];
         if (shouldLoop && numLoops > 1) {
             for (let i = 0; i < numLoops; i++) {
-                loopedCoords.push(...snappedRoute);
-                loopedCoords.push(...snappedRoute.slice().reverse());
+                loopedCoords.push(...window.snappedRoute);
+                loopedCoords.push(...window.snappedRoute.slice().reverse());
             }
         } else {
-            loopedCoords = [...snappedRoute];
+            loopedCoords = [...window.snappedRoute];
         }
 
         // Generate timestamps and elevation for the looped route

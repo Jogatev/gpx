@@ -73,7 +73,7 @@ class RouteSnappingService {
                     snappedCoords = this.optimizeForWalking(coordinates);
                 } else {
                     snappedCoords = await this.simulateRoadSnapping(coordinates, { ...options, profile });
-                }
+            }
             }
             // Simplify route if requested
             if (simplify && snappedCoords.length > maxPoints) {
