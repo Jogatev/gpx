@@ -20,14 +20,31 @@ class RouteSnappingService {
             return coordinates;
         }
 
-        const {
+        let {
             profile = 'driving',
             simplify = true,
             maxPoints = 100
         } = options;
 
+        // Always use walking profile if requested
+        if (options.profile === 'walking') {
+            profile = 'walking';
+        }
+
+        // Limit waypoints for Mapbox/OSRM to 10 (start, end, and evenly spaced intermediates)
+        let snappedInputCoords = coordinates;
+        if (coordinates.length > 10) {
+            snappedInputCoords = [];
+            snappedInputCoords.push(coordinates[0]);
+            const step = (coordinates.length - 1) / 9;
+            for (let i = 1; i < 9; i++) {
+                snappedInputCoords.push(coordinates[Math.round(i * step)]);
+            }
+            snappedInputCoords.push(coordinates[coordinates.length - 1]);
+        }
+
         // Check cache first
-        const cacheKey = this.generateCacheKey(coordinates, options);
+        const cacheKey = this.generateCacheKey(snappedInputCoords, { ...options, profile });
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
@@ -36,19 +53,24 @@ class RouteSnappingService {
             Utils.showLoading('Snapping route to roads...');
             
             // Try Mapbox Directions first for all profiles
-            let snappedCoords = await this.tryMapbox(coordinates, options);
+            let snappedCoords = await this.tryMapbox(snappedInputCoords, { ...options, profile });
             
             // Fallback to OSRM if Mapbox fails
             if (!snappedCoords || snappedCoords.length === 0) {
-                snappedCoords = await this.tryOSRM(coordinates, options);
+                snappedCoords = await this.tryOSRM(snappedInputCoords, { ...options, profile });
             }
             
             if (!snappedCoords || snappedCoords.length === 0) {
-                snappedCoords = await this.tryGraphHopper(coordinates, options);
+                snappedCoords = await this.tryGraphHopper(snappedInputCoords, { ...options, profile });
             }
             
             if (!snappedCoords || snappedCoords.length === 0) {
-                snappedCoords = await this.simulateRoadSnapping(coordinates, options);
+                // For walking, use optimizeForWalking for a more realistic fallback
+                if (profile === 'walking') {
+                    snappedCoords = this.optimizeForWalking(coordinates);
+                } else {
+                    snappedCoords = await this.simulateRoadSnapping(coordinates, { ...options, profile });
+                }
             }
 
             // Simplify route if requested
@@ -65,9 +87,12 @@ class RouteSnappingService {
         } catch (error) {
             console.error('Error snapping route to roads:', error);
             Utils.hideLoading();
-            
+            // For walking, use optimizeForWalking for a more realistic fallback
+            if (profile === 'walking') {
+                return this.optimizeForWalking(coordinates);
+            }
             // Fallback to simulated snapping
-            return this.simulateRoadSnapping(coordinates, options);
+            return this.simulateRoadSnapping(coordinates, { ...options, profile });
         }
     }
 
