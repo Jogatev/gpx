@@ -10,7 +10,8 @@
     "build": "echo 'Static site - no build required'",
     "deploy": "vercel --prod",
     "test": "echo 'No tests specified'",
-    "lint": "echo 'No linter configured'"
+    "lint": "echo 'No linter configured'",
+    "vercel-build": "echo 'Static site deployment'"
   },
   "keywords": [
     "gpx",
@@ -34,10 +35,7 @@
     "url": "https://github.com/yourusername/gpx-route-generator/issues"
   },
   "homepage": "https://gpx-route-generator.vercel.app",
-  "dependencies": {
-    "leaflet": "^1.9.4",
-    "leaflet.draw": "^1.0.4"
-  },
+  "dependencies": {},
   "devDependencies": {
     "vercel": "^32.0.0"
   },
