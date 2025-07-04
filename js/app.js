@@ -629,4 +629,22 @@ class GPXRouteGenerator {
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.routeGenerator = new GPXRouteGenerator();
+
+    // Sidebar toggle logic
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('toggleSidebar');
+    const toggleIcon = toggleBtn ? toggleBtn.querySelector('i') : null;
+    if (sidebar && toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            const collapsed = sidebar.classList.toggle('sidebar-collapsed');
+            // Change icon direction
+            if (toggleIcon) {
+                toggleIcon.className = collapsed ? 'fas fa-angle-right' : 'fas fa-angle-left';
+            }
+            // Update aria-label
+            toggleBtn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+            // Keep focus on button
+            toggleBtn.focus();
+        });
+    }
 }); 
