@@ -3,186 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Route Generator - Create Custom GPX Routes</title>
+    <title>GPX Route Generator - Advanced Running Route Creator</title>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-    
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="styles.css">
     
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <h1><i class="fas fa-route"></i> mwhehehe</h1>
-                <p>Create custom routes and export realistic GPX files</p>
-            </div>
-        </header>
-
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Sidebar -->
-            <aside class="sidebar">
-                <div class="sidebar-section">
-                    <h3><i class="fas fa-search"></i> Search Location</h3>
-                    <div class="search-container" style="position:relative;">
-                        <input type="text" id="locationSearch" placeholder="Search for a location...">
-                        <button id="searchBtn"><i class="fas fa-search"></i></button>
-                        <div id="searchSuggestions" class="search-suggestions" style="display:none;"></div>
-                    </div>
-                </div>
-
-                <div class="sidebar-section">
-                    <h3><i class="fas fa-draw-polygon"></i> Drawing Tools</h3>
-                    <div class="tool-buttons">
-                        <button id="drawPolyline" class="tool-btn active">
-                            <i class="fas fa-pen"></i> Draw Route
-                        </button>
-                        <button id="drawPolygon" class="tool-btn">
-                            <i class="fas fa-shapes"></i> Draw Shape
-                        </button>
-                        <button id="addMarker" class="tool-btn">
-                            <i class="fas fa-map-marker-alt"></i> Add Marker
-                        </button>
-                        <button id="clearAll" class="tool-btn danger">
-                            <i class="fas fa-trash"></i> Clear All
-                        </button>
-                    </div>
-                    <button id="alignPathBtn" class="align-path-btn" style="width:100%;margin-top:1em;">
-                        <i class="fas fa-route"></i> Align Path to Road
-                    </button>
-                </div>
-
-                <div class="sidebar-section" id="runDetailsSection">
-                    <h3><i class="fas fa-running"></i> Run Details</h3>
-                    <div style="margin: 0.5em 0 1em 0; text-align:center;">
-                        <label style="font-size:0.95em; margin-right:8px;">Run</label>
-                        <label class="switch">
-                            <input type="checkbox" id="activityTypeToggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <label style="font-size:0.95em; margin-left:8px;">Bike</label>
-                    </div>
-                    <div class="run-stats-box">
-                        <div class="run-stat"><i class="fas fa-ruler-horizontal"></i><span id="runStatDistance">0</span><span class="stat-label">Distance</span></div>
-                        <div class="run-stat"><i class="fas fa-stopwatch"></i><span id="runStatDuration">0:00</span><span class="stat-label">Duration</span></div>
-                        <div class="run-stat"><i class="fas fa-mountain"></i><span id="runStatElevation">0m</span><span class="stat-label">Elevation Gain</span></div>
-                        <div class="run-stat"><i class="fas fa-running"></i><span id="runStatPace">5.50</span><span class="stat-label" id="paceUnitLabel">min/km</span></div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="paceUnit">Pace Unit:</label>
-                        <select id="paceUnit">
-                            <option value="min/km">min/km</option>
-                            <option value="min/mi">min/mi</option>
-                        </select>
-                    </div>
-                    <div class="setting-group">
-                        <label for="avgPace">Average Pace:</label>
-                        <span id="avgPaceValue">5.50</span> <span id="paceUnitLabel2">min/km</span>
-                    </div>
-                    <input type="range" id="avgPace" min="3.0" max="10.0" step="0.01" value="5.50">
-                    <div class="setting-group">
-                        <label for="paceInconsistency">Pace Inconsistency:</label>
-                        <span id="paceInconsistencyValue">0%</span>
-                    </div>
-                    <input type="range" id="paceInconsistency" min="0" max="100" step="1" value="0">
-                    <div style="font-size:0.85em; color:#888; margin-bottom:0.5em;">Constant pace throughout the run (most efficient)</div>
-                    <div class="setting-group">
-                        <label for="includeHR">Include Heart Rate Data</label>
-                        <input type="checkbox" id="includeHR">
-                    </div>
-                    <div class="setting-group">
-                        <label for="runName">Run Name:</label>
-                        <input type="text" id="runName" value="Morning Run">
-                    </div>
-                    <div class="setting-group">
-                        <label for="runDate">Date:</label>
-                        <input type="date" id="runDate">
-                    </div>
-                    <div class="setting-group">
-                        <label for="runStartTime">Start Time:</label>
-                        <input type="time" id="runStartTime">
-                    </div>
-                    <div class="setting-group">
-                        <label for="runDesc">Description:</label>
-                        <textarea id="runDesc" rows="2" placeholder="Great morning run through the park..."></textarea>
-                    </div>
-                    <div class="setting-group">
-                        <label for="loopRoute">Loop Route:</label>
-                        <input type="checkbox" id="loopRoute">
-                    </div>
-                    <div class="setting-group" id="loopCountGroup" style="display: none;">
-                        <label for="loopCount">Number of Loops:</label>
-                        <input type="number" id="loopCount" min="1" max="10" value="1" style="width: 60px;">
-                    </div>
-                </div>
-                <div class="sidebar-section">
-                    <h3><i class="fas fa-download"></i> Export</h3>
-                    <div class="export-buttons">
-                        <button id="exportGPX" class="export-btn primary">
-                            <i class="fas fa-file-code"></i> Export GPX
-                        </button>
-                        <button id="exportTCX" class="export-btn">
-                            <i class="fas fa-file-alt"></i> Export TCX
-                        </button>
-                        <button id="exportFIT" class="export-btn">
-                            <i class="fas fa-file-binary"></i> Export FIT
-                        </button>
-                    </div>
-                </div>
-            </aside>
-
-            <!-- Map Container -->
-            <main class="map-container">
-                <div id="map"></div>
-                
-                <!-- Map Controls Overlay -->
-                <div class="map-controls">
-                    <button id="fullscreenBtn" class="control-btn">
-                        <i class="fas fa-expand"></i>
-                    </button>
-                    <button id="centerMapBtn" class="control-btn">
-                        <i class="fas fa-crosshairs"></i>
-                    </button>
-                </div>
-            </main>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1><i class="fas fa-route"></i> GPX Route Generator</h1>
+            <p class="subtitle">Advanced Running Route Creator with Smart Snapping</p>
         </div>
+    </header>
 
-        <!-- Status Bar -->
-        <footer class="status-bar">
-            <div class="status-content">
-                <span id="statusMessage">Ready to create routes</span>
-                <span id="coordinates">Lat: 0, Lng: 0</span>
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <!-- Quick Actions -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+                <div class="button-group">
+                    <button id="clearRoute" class="btn btn-secondary">
+                        <i class="fas fa-trash"></i> Clear Route
+                    </button>
+                    <button id="undoLast" class="btn btn-secondary">
+                        <i class="fas fa-undo"></i> Undo Last
+                    </button>
+                    <button id="fitToRoute" class="btn btn-secondary">
+                        <i class="fas fa-expand"></i> Fit to Route
+                    </button>
+                </div>
             </div>
-        </footer>
+
+            <!-- Route Templates -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-map-marked-alt"></i> Route Templates</h3>
+                <div class="template-selector">
+                    <select id="templateSelect" class="form-select">
+                        <option value="">Choose a template...</option>
+                        <option value="golden-gate-park">Golden Gate Park Loop</option>
+                        <option value="embarcadero">Embarcadero Waterfront</option>
+                        <option value="twin-peaks">Twin Peaks Challenge</option>
+                    </select>
+                    <button id="applyTemplate" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Apply
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loop Configuration -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-redo"></i> Loop Settings</h3>
+                <div class="form-group">
+                    <label for="loopType">Loop Type:</label>
+                    <select id="loopType" class="form-select">
+                        <option value="out-and-back">↔️ Out and Back</option>
+                        <option value="circular">🔄 Circular Loop</option>
+                        <option value="figure-8">∞ Figure 8</option>
+                        <option value="multiple-waypoints">📍 Multiple Waypoints</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="numLoops">Number of Loops:</label>
+                    <input type="number" id="numLoops" class="form-input" value="1" min="1" max="10">
+                </div>
+                <div class="form-group">
+                    <label for="gapDistance">Gap Distance (m):</label>
+                    <input type="number" id="gapDistance" class="form-input" value="50" min="0" max="500">
+                </div>
+                <button id="createLoop" class="btn btn-success">
+                    <i class="fas fa-magic"></i> Create Loop
+                </button>
+            </div>
+
+            <!-- Snapping Options -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-magnet"></i> Snapping Options</h3>
+                <div class="form-group">
+                    <label for="snapMode">Snap Mode:</label>
+                    <select id="snapMode" class="form-select">
+                        <option value="walking">🚶 Walking</option>
+                        <option value="cycling">🚴 Cycling</option>
+                        <option value="driving">🚗 Driving</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoSnap" checked>
+                        <span class="checkmark"></span>
+                        Auto-snap to roads
+                    </label>
+                </div>
+                <button id="snapRoute" class="btn btn-info">
+                    <i class="fas fa-magnet"></i> Snap Route
+                </button>
+            </div>
+
+            <!-- Route Statistics -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-chart-line"></i> Route Statistics</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Distance:</span>
+                        <span id="distance" class="stat-value">0.0 km</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Duration:</span>
+                        <span id="duration" class="stat-value">0:00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Elevation:</span>
+                        <span id="elevation" class="stat-value">0 m</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Pace:</span>
+                        <span id="pace" class="stat-value">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Options -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-download"></i> Export</h3>
+                <div class="button-group">
+                    <button id="exportGPX" class="btn btn-primary">
+                        <i class="fas fa-file-code"></i> Export GPX
+                    </button>
+                    <button id="exportKML" class="btn btn-warning">
+                        <i class="fas fa-file-code"></i> Export KML
+                    </button>
+                    <button id="exportJSON" class="btn btn-info">
+                        <i class="fas fa-file-code"></i> Export JSON
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="map-container">
+            <div id="map"></div>
+            
+            <!-- Map Controls Overlay -->
+            <div class="map-controls">
+                <div class="control-group">
+                    <button id="drawMode" class="control-btn active" title="Draw Mode">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <button id="panMode" class="control-btn" title="Pan Mode">
+                        <i class="fas fa-hand-paper"></i>
+                    </button>
+                    <button id="measureMode" class="control-btn" title="Measure Distance">
+                        <i class="fas fa-ruler"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <span id="statusMessage">Ready to draw your route</span>
+                <span id="coordinates" class="coordinates-display"></span>
+            </div>
+        </main>
     </div>
 
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay hidden">
         <div class="loading-content">
-            <i class="fas fa-spinner fa-spin"></i>
+            <div class="spinner"></div>
             <p id="loadingMessage">Processing route...</p>
         </div>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-    
-    <!-- Config JS (Mapbox token) -->
-    <script src="config.js"></script>
-    <!-- Custom JS -->
     <script src="js/utils.js"></script>
     <script src="js/elevation.js"></script>
     <script src="js/route-snapping.js"></script>
+    <script src="js/route-templates.js"></script>
+    <script src="js/route-optimization.js"></script>
     <script src="js/gpx-export.js"></script>
-    <script src="js/shape-templates.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html> 

@@ -4,6 +4,16 @@
  */
 
 class GPXExport {
+    constructor() {
+        this.defaultMetadata = {
+            name: 'Generated Route',
+            description: 'Route created with GPX Route Generator',
+            author: 'GPX Route Generator',
+            time: new Date().toISOString(),
+            keywords: 'running, route, gpx'
+        };
+    }
+
     /**
      * Generate GPX XML string from route data and run details
      * @param {Array} coordinates - Array of [lat, lng] coordinates
@@ -67,6 +77,342 @@ class GPXExport {
     static downloadGPX(gpxString, filename = 'route.gpx') {
         Utils.downloadFile(gpxString, filename, 'application/gpx+xml');
     }
+
+    /**
+     * Generate GPX content with enhanced metadata
+     */
+    async generateGPX(coordinates, metadata = {}) {
+        const meta = { ...this.defaultMetadata, ...metadata };
+        
+        let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GPX Route Generator" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${this.escapeXml(meta.name)}</name>
+    <desc>${this.escapeXml(meta.description)}</desc>
+    <author>
+      <name>${this.escapeXml(meta.author)}</name>
+    </author>
+    <time>${meta.time}</time>
+    <keywords>${this.escapeXml(meta.keywords)}</keywords>
+  </metadata>
+  <rte>
+    <name>${this.escapeXml(meta.name)}</name>
+    <desc>${this.escapeXml(meta.description)}</desc>`;
+
+        // Add route points
+        coordinates.forEach((coord, index) => {
+            gpx += `
+    <rtept lat="${coord[0]}" lon="${coord[1]}">
+      <name>Point ${index + 1}</name>
+    </rtept>`;
+        });
+
+        gpx += `
+  </rte>
+</gpx>`;
+
+        return gpx;
+    }
+
+    /**
+     * Generate KML content
+     */
+    async generateKML(coordinates, metadata = {}) {
+        const meta = { ...this.defaultMetadata, ...metadata };
+        
+        let kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${this.escapeXml(meta.name)}</name>
+    <description>${this.escapeXml(meta.description)}</description>
+    <Style id="routeStyle">
+      <LineStyle>
+        <color>ff0066ff</color>
+        <width>4</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>7f0066ff</color>
+      </PolyStyle>
+    </Style>
+    <Placemark>
+      <name>${this.escapeXml(meta.name)}</name>
+      <description>${this.escapeXml(meta.description)}</description>
+      <styleUrl>#routeStyle</styleUrl>
+      <LineString>
+        <coordinates>`;
+
+        // Add coordinates in KML format (longitude,latitude,altitude)
+        coordinates.forEach(coord => {
+            kml += `
+          ${coord[1]},${coord[0]},0`;
+        });
+
+        kml += `
+        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>`;
+
+        return kml;
+    }
+
+    /**
+     * Generate TCX content (Training Center XML)
+     */
+    async generateTCX(coordinates, metadata = {}) {
+        const meta = { ...this.defaultMetadata, ...metadata };
+        
+        let tcx = `<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+  <Courses>
+    <Course>
+      <Name>${this.escapeXml(meta.name)}</Name>
+      <Lap>
+        <Track>
+          <Trackpoint>`;
+
+        // Add track points
+        coordinates.forEach(coord => {
+            tcx += `
+            <Position>
+              <LatitudeDegrees>${coord[0]}</LatitudeDegrees>
+              <LongitudeDegrees>${coord[1]}</LongitudeDegrees>
+            </Position>`;
+        });
+
+        tcx += `
+        </Trackpoint>
+      </Track>
+    </Lap>
+  </Courses>
+</TrainingCenterDatabase>`;
+
+        return tcx;
+    }
+
+    /**
+     * Generate GeoJSON content
+     */
+    async generateGeoJSON(coordinates, metadata = {}) {
+        const meta = { ...this.defaultMetadata, ...metadata };
+        
+        const geojson = {
+            type: "FeatureCollection",
+            features: [
+                {
+                    type: "Feature",
+                    properties: {
+                        name: meta.name,
+                        description: meta.description,
+                        author: meta.author,
+                        time: meta.time,
+                        keywords: meta.keywords
+                    },
+                    geometry: {
+                        type: "LineString",
+                        coordinates: coordinates.map(coord => [coord[1], coord[0]]) // GeoJSON uses [lng, lat]
+                    }
+                }
+            ]
+        };
+
+        return JSON.stringify(geojson, null, 2);
+    }
+
+    /**
+     * Generate FIT file content (simplified)
+     */
+    async generateFIT(coordinates, metadata = {}) {
+        // Note: FIT is a binary format, this is a simplified representation
+        const meta = { ...this.defaultMetadata, ...metadata };
+        
+        // For now, return a placeholder since FIT requires complex binary encoding
+        return `# FIT file format (binary)
+# This is a placeholder for FIT file generation
+# Actual FIT files require specialized libraries for binary encoding
+Route: ${meta.name}
+Points: ${coordinates.length}
+Generated: ${meta.time}`;
+    }
+
+    /**
+     * Generate CSV content
+     */
+    async generateCSV(coordinates, metadata = {}) {
+        const meta = { ...this.defaultMetadata, ...metadata };
+        
+        let csv = `latitude,longitude,elevation,timestamp\n`;
+        
+        coordinates.forEach((coord, index) => {
+            const timestamp = new Date(Date.now() + index * 60000).toISOString(); // 1 minute intervals
+            csv += `${coord[0]},${coord[1]},0,${timestamp}\n`;
+        });
+
+        return csv;
+    }
+
+    /**
+     * Generate route statistics
+     */
+    calculateRouteStats(coordinates) {
+        if (coordinates.length < 2) {
+            return {
+                distance: 0,
+                elevation: 0,
+                points: 0
+            };
+        }
+
+        let totalDistance = 0;
+        let totalElevation = 0;
+
+        for (let i = 1; i < coordinates.length; i++) {
+            const prev = coordinates[i - 1];
+            const curr = coordinates[i];
+            
+            // Calculate distance
+            const distance = this.calculateDistance(prev, curr);
+            totalDistance += distance;
+            
+            // Calculate elevation (placeholder)
+            const elevation = Math.random() * 10; // Placeholder
+            totalElevation += elevation;
+        }
+
+        return {
+            distance: totalDistance,
+            elevation: totalElevation,
+            points: coordinates.length,
+            averagePace: this.calculateAveragePace(totalDistance)
+        };
+    }
+
+    /**
+     * Calculate distance between two points
+     */
+    calculateDistance(point1, point2) {
+        const R = 6371; // Earth's radius in km
+        const dLat = (point2[0] - point1[0]) * Math.PI / 180;
+        const dLon = (point2[1] - point1[1]) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(point1[0] * Math.PI / 180) * Math.cos(point2[0] * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    /**
+     * Calculate average pace
+     */
+    calculateAveragePace(distance) {
+        // Assuming 5:30 min/km pace
+        const paceMinutes = 5.5;
+        return paceMinutes;
+    }
+
+    /**
+     * Escape XML special characters
+     */
+    escapeXml(text) {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    }
+
+    /**
+     * Generate route with elevation data
+     */
+    async generateRouteWithElevation(coordinates) {
+        try {
+            // Try to get elevation data
+            const elevationData = await window.ElevationService.getElevationData(coordinates);
+            
+            if (elevationData) {
+                return coordinates.map((coord, index) => ({
+                    lat: coord[0],
+                    lng: coord[1],
+                    elevation: elevationData[index] || 0
+                }));
+            }
+        } catch (error) {
+            console.warn('Failed to get elevation data:', error);
+        }
+
+        // Return coordinates without elevation if elevation service fails
+        return coordinates.map(coord => ({
+            lat: coord[0],
+            lng: coord[1],
+            elevation: 0
+        }));
+    }
+
+    /**
+     * Generate route with timing data
+     */
+    generateRouteWithTiming(coordinates, options = {}) {
+        const {
+            startTime = new Date(),
+            paceMinutes = 5.5,
+            paceVariation = 0.1
+        } = options;
+
+        return coordinates.map((coord, index) => {
+            const baseTime = new Date(startTime.getTime() + index * paceMinutes * 60 * 1000);
+            const variation = (Math.random() - 0.5) * paceVariation * 60 * 1000;
+            const timestamp = new Date(baseTime.getTime() + variation);
+
+            return {
+                lat: coord[0],
+                lng: coord[1],
+                timestamp: timestamp.toISOString(),
+                pace: paceMinutes + (Math.random() - 0.5) * paceVariation
+            };
+        });
+    }
+
+    /**
+     * Generate route with heart rate data
+     */
+    generateRouteWithHeartRate(coordinates, options = {}) {
+        const {
+            baseHR = 140,
+            hrVariation = 20,
+            maxHR = 180,
+            minHR = 120
+        } = options;
+
+        return coordinates.map((coord, index) => {
+            const variation = (Math.random() - 0.5) * hrVariation;
+            const heartRate = Math.max(minHR, Math.min(maxHR, baseHR + variation));
+
+            return {
+                lat: coord[0],
+                lng: coord[1],
+                heartRate: Math.round(heartRate)
+            };
+        });
+    }
+
+    /**
+     * Generate comprehensive route data
+     */
+    async generateComprehensiveRoute(coordinates, options = {}) {
+        const routeWithElevation = await this.generateRouteWithElevation(coordinates);
+        const routeWithTiming = this.generateRouteWithTiming(coordinates, options);
+        const routeWithHR = this.generateRouteWithHeartRate(coordinates, options);
+
+        return routeWithElevation.map((point, index) => ({
+            ...point,
+            timestamp: routeWithTiming[index]?.timestamp,
+            pace: routeWithTiming[index]?.pace,
+            heartRate: routeWithHR[index]?.heartRate
+        }));
+    }
 }
 
-window.GPXExport = GPXExport; 
+// Create global instance
+window.GPXExport = new GPXExport(); 

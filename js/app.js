@@ -1,534 +1,518 @@
-window.snappedRoute = [];
+/**
+ * GPX Route Generator - Main Application
+ * Advanced running route creator with smart snapping and modern UI
+ */
 
-document.addEventListener('DOMContentLoaded', function () {
-    // Initialize the map
-    const map = L.map('map', {
-        center: [37.7749, -122.4194], // Default to San Francisco
-        zoom: 13,
-        zoomControl: true,
-        attributionControl: true
-    });
+class GPXRouteGenerator {
+    constructor() {
+        this.map = null;
+        this.drawnItems = null;
+        this.currentRoute = [];
+        this.snappedRoute = null;
+        this.isDrawing = false;
+        this.currentPolyline = null;
+        this.mode = 'draw'; // 'draw', 'pan', 'measure'
+        
+        // Initialize the application
+        this.init();
+    }
 
-    // Add Mapbox tile layer
-    L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1Ijoiam9nYXRldiIsImEiOiJjbWNsajl1MWgwY2ZsMm1vbTN6enJnZ245In0.Us4E9e5nunbG0G0JbQI1Bw', {
-        maxZoom: 19,
-        attribution: '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        id: 'mapbox/streets-v11', // You can change to outdoors-v12, satellite-v9, etc.
-        tileSize: 512,
-        zoomOffset: -1,
-        accessToken: 'pk.eyJ1Ijoiam9nYXRldiIsImEiOiJjbWNsajl1MWgwY2ZsMm1vbTN6enJnZ245In0.Us4E9e5nunbG0G0JbQI1Bw'
-    }).addTo(map);
-
-    // Show coordinates on mouse move
-    map.on('mousemove', function (e) {
-        if (window.Utils) {
-            Utils.updateCoordinates(e.latlng.lat, e.latlng.lng);
-        }
-    });
-
-    // Expose map for other modules
-    window.routeMap = map;
-
-    // --- Drawing Layer ---
-    let drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    // Leaflet.draw controls
-    const drawControl = new L.Control.Draw({
-        edit: {
-            featureGroup: drawnItems,
-            remove: true
-        },
-        draw: {
-            polyline: {
-                shapeOptions: { color: '#3498db', weight: 5 },
-                allowIntersection: true,
-                showLength: true
-            },
-            polygon: {
-                allowIntersection: true,
-                showArea: true,
-                shapeOptions: { color: '#8e44ad', weight: 4 }
-            },
-            rectangle: false,
-            circle: false,
-            marker: {
-                icon: new L.Icon.Default()
-            }
-        }
-    });
-    map.addControl(drawControl);
-
-    // Store current route state
-    let currentRoute = {
-        coordinates: [],
-        elevations: [],
-        timestamps: [],
-        layer: null
-    };
-
-    // --- Drawing Events ---
-    map.on(L.Draw.Event.CREATED, async function (e) {
-        const layer = e.layer;
-        drawnItems.clearLayers();
-        drawnItems.addLayer(layer);
-        if (layer instanceof L.Polyline || layer instanceof L.Polygon) {
-            const coords = layer.getLatLngs();
-            let flatCoords = coords;
-            if (Array.isArray(coords[0])) flatCoords = coords[0];
-            const latlngs = flatCoords.map(ll => [ll.lat, ll.lng]);
-            lastDrawnCoords = latlngs;
-            isSnapped = false;
-            alignPathBtn.style.display = 'flex';
-            // Don't snap yet, just show the path
-            await handleRouteDraw(latlngs, { skipSnap: true });
-        }
-    });
-
-    // --- Shape Templates ---
-    document.querySelectorAll('.shape-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
-            const shape = btn.getAttribute('data-shape');
-            const center = map.getCenter();
-            let coords = [];
-            if (window.ShapeTemplates) {
-                if (shape === 'heart') coords = ShapeTemplates.heart([center.lat, center.lng]);
-                if (shape === 'circle') coords = ShapeTemplates.circle([center.lat, center.lng]);
-                if (shape === 'star') coords = ShapeTemplates.star([center.lat, center.lng]);
-                if (shape === 'square') coords = ShapeTemplates.square([center.lat, center.lng]);
-            }
-            if (coords.length) {
-                // Draw the shape as a polyline
-                const poly = L.polyline(coords, { color: '#e67e22', weight: 5 });
-                drawnItems.addLayer(poly);
-                await handleRouteDraw(coords);
-            }
-        });
-    });
-
-    // --- Clear All ---
-    document.getElementById('clearAll').addEventListener('click', function () {
-        drawnItems.clearLayers();
-        currentRoute = { coordinates: [], elevations: [], timestamps: [], layer: null };
-        updateRouteInfo();
-    });
-
-    // --- Export GPX ---
-    document.getElementById('exportGPX').addEventListener('click', function () {
-        if (currentRoute.coordinates.length) {
-            const gpx = GPXExport.generateGPX(
-                currentRoute.coordinates,
-                currentRoute.elevations,
-                currentRoute.timestamps,
-                { name: 'Custom Route', desc: 'Generated by Route Generator' }
-            );
-            GPXExport.downloadGPX(gpx, 'route.gpx');
-        } else {
-            Utils.updateStatus('Draw a route first!');
-        }
-    });
-
-    // --- Align Path to Road Button Logic (improved) ---
-    const alignPathBtn = document.getElementById('alignPathBtn');
-    let lastDrawnCoords = null;
-    let isSnapped = false;
-
-    // Align Path to Road button click
-    alignPathBtn.addEventListener('click', async function () {
-        if (!lastDrawnCoords || !lastDrawnCoords.length) {
-            Utils.updateStatus('Draw a route first!');
-            return;
-        }
-        alignPathBtn.disabled = true;
-        alignPathBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aligning...';
+    async init() {
         try {
-            await handleRouteDraw(lastDrawnCoords, { forceSnap: true });
-            isSnapped = true;
+            await this.initializeMap();
+            this.setupEventListeners();
+            this.setupUI();
+            this.showToast('Application loaded successfully!', 'success');
+        } catch (error) {
+            console.error('Failed to initialize application:', error);
+            this.showToast('Failed to initialize application', 'error');
+        }
+    }
+
+    async initializeMap() {
+        // Initialize map with Mapbox tiles
+        this.map = L.map('map', {
+            center: [37.7749, -122.4194], // San Francisco
+            zoom: 13,
+            zoomControl: true,
+            attributionControl: true
+        });
+
+        // Add Mapbox tiles
+        L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+            accessToken: window.MAPBOX_TOKEN || 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw',
+            maxZoom: 18,
+            attribution: '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a>'
+        }).addTo(this.map);
+
+        // Initialize drawn items layer
+        this.drawnItems = new L.FeatureGroup();
+        this.map.addLayer(this.drawnItems);
+
+        // Setup drawing events
+        this.map.on('click', (e) => this.handleMapClick(e));
+        this.map.on('mousemove', (e) => this.handleMouseMove(e));
+    }
+
+    setupEventListeners() {
+        // Quick Actions
+        document.getElementById('clearRoute').addEventListener('click', () => this.clearRoute());
+        document.getElementById('undoLast').addEventListener('click', () => this.undoLastPoint());
+        document.getElementById('fitToRoute').addEventListener('click', () => this.fitToRoute());
+
+        // Template Actions
+        document.getElementById('applyTemplate').addEventListener('click', () => this.applySelectedTemplate());
+
+        // Loop Configuration
+        document.getElementById('createLoop').addEventListener('click', () => this.createLoop());
+
+        // Snapping Options
+        document.getElementById('snapRoute').addEventListener('click', () => this.snapRoute());
+        document.getElementById('autoSnap').addEventListener('change', (e) => {
+            this.autoSnap = e.target.checked;
+        });
+
+        // Export Options
+        document.getElementById('exportGPX').addEventListener('click', () => this.exportGPX());
+        document.getElementById('exportKML').addEventListener('click', () => this.exportKML());
+        document.getElementById('exportJSON').addEventListener('click', () => this.exportJSON());
+
+        // Map Controls
+        document.getElementById('drawMode').addEventListener('click', () => this.setMode('draw'));
+        document.getElementById('panMode').addEventListener('click', () => this.setMode('pan'));
+        document.getElementById('measureMode').addEventListener('click', () => this.setMode('measure'));
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+    }
+
+    setupUI() {
+        // Set default values
+        document.getElementById('runDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('runStartTime').value = new Date().toTimeString().slice(0, 5);
+        
+        // Initialize auto-snap
+        this.autoSnap = document.getElementById('autoSnap').checked;
+        
+        // Update status
+        this.updateStatus('Ready to draw your route');
+    }
+
+    handleMapClick(e) {
+        if (this.mode !== 'draw') return;
+
+        const latlng = e.latlng;
+        this.addPoint(latlng);
+
+        if (this.autoSnap && this.currentRoute.length > 1) {
+            this.snapRoute();
+        }
+    }
+
+    handleMouseMove(e) {
+        const latlng = e.latlng;
+        document.getElementById('coordinates').textContent = 
+            `Lat: ${latlng.lat.toFixed(6)}, Lng: ${latlng.lng.toFixed(6)}`;
+    }
+
+    addPoint(latlng) {
+        this.currentRoute.push([latlng.lat, latlng.lng]);
+        
+        // Update polyline
+        if (this.currentPolyline) {
+            this.map.removeLayer(this.currentPolyline);
+        }
+        
+        this.currentPolyline = L.polyline(this.currentRoute, {
+            color: '#e67e22',
+            weight: 5,
+            opacity: 0.8
+        }).addTo(this.map);
+
+        this.updateStats();
+        this.updateStatus(`Added point ${this.currentRoute.length}`);
+    }
+
+    clearRoute() {
+        this.currentRoute = [];
+        this.snappedRoute = null;
+        
+        if (this.currentPolyline) {
+            this.map.removeLayer(this.currentPolyline);
+            this.currentPolyline = null;
+        }
+        
+        this.drawnItems.clearLayers();
+        this.updateStats();
+        this.updateStatus('Route cleared');
+        this.showToast('Route cleared', 'success');
+    }
+
+    undoLastPoint() {
+        if (this.currentRoute.length > 0) {
+            this.currentRoute.pop();
+            
+            if (this.currentPolyline) {
+                this.map.removeLayer(this.currentPolyline);
+            }
+            
+            if (this.currentRoute.length > 0) {
+                this.currentPolyline = L.polyline(this.currentRoute, {
+                    color: '#e67e22',
+                    weight: 5,
+                    opacity: 0.8
+                }).addTo(this.map);
+            } else {
+                this.currentPolyline = null;
+            }
+            
+            this.updateStats();
+            this.updateStatus(`Removed last point. ${this.currentRoute.length} points remaining`);
+        }
+    }
+
+    fitToRoute() {
+        if (this.currentRoute.length > 0) {
+            const bounds = L.latLngBounds(this.currentRoute);
+            this.map.fitBounds(bounds, { padding: [20, 20] });
+            this.updateStatus('Map fitted to route');
+        }
+    }
+
+    async applySelectedTemplate() {
+        const templateSelect = document.getElementById('templateSelect');
+        const templateName = templateSelect.value;
+        
+        if (!templateName) {
+            this.showToast('Please select a template', 'warning');
+            return;
+        }
+
+        try {
+            this.showLoading('Applying template...');
+            const template = await window.RouteTemplates.applyTemplate(templateName, this.map);
+            
+            // Set the current route to template coordinates
+            this.currentRoute = template.coordinates;
+            
+            // Draw the route
+            if (this.currentPolyline) {
+                this.map.removeLayer(this.currentPolyline);
+            }
+            
+            this.currentPolyline = L.polyline(this.currentRoute, {
+                color: '#e67e22',
+                weight: 5,
+                opacity: 0.8
+            }).addTo(this.map);
+
+            this.updateStats();
+            this.updateStatus(`Applied template: ${template.name}`);
+            this.showToast(`Template "${template.name}" applied successfully!`, 'success');
+            
+        } catch (error) {
+            console.error('Failed to apply template:', error);
+            this.showToast('Failed to apply template', 'error');
         } finally {
-            alignPathBtn.disabled = false;
-            alignPathBtn.innerHTML = '<i class="fas fa-route"></i> Align Path to Road';
-        }
-    });
-
-    // --- Handle Route Drawing, Snapping, Elevation, and Timestamps ---
-    async function handleRouteDraw(coords, options = {}) {
-        Utils.showLoading('Processing route...');
-        let snappedCoords = coords;
-        // Always use walking profile for snapping
-        if ((options.forceSnap || (!options.skipSnap && !isSnapped)) && window.RouteSnappingService) {
-            snappedCoords = await window.RouteSnappingService.snapToRoads(coords, { profile: 'walking' });
-            isSnapped = true;
-        } else if (options.skipSnap) {
-            isSnapped = false;
-        }
-        window.snappedRoute = snappedCoords;
-        // Get elevation data
-        let elevations = [];
-        if (window.ElevationService) {
-            elevations = await window.ElevationService.getElevationData(snappedCoords);
-        }
-        // Generate timestamps based on pace
-        const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5; // min/km
-        const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
-        const timestamps = generateTimestamps(snappedCoords, pace, startTime);
-        // Draw the route
-        drawnItems.clearLayers();
-        const poly = L.polyline(snappedCoords, { color: isSnapped ? '#3498db' : '#e67e22', weight: 5 });
-        drawnItems.addLayer(poly);
-        // Update current route state
-        currentRoute = {
-            coordinates: snappedCoords,
-            elevations,
-            timestamps,
-            layer: poly
-        };
-        
-        // Apply loops if enabled
-        if (loopRoute && loopRoute.checked) {
-            await updateRouteWithLoops();
-        } else {
-            updateRouteInfo();
-        }
-        
-        Utils.hideLoading();
-    }
-
-    // --- Modified generateTimestamps to ensure valid date ---
-    function generateTimestamps(coords, pace, startTime) {
-        if (!coords.length) return [];
-        let timestamps = [];
-        let totalSeconds = 0;
-        let prev = coords[0];
-        // Ensure startTime is a valid ISO string
-        let time = startTime ? new Date(startTime) : new Date();
-        if (isNaN(time.getTime())) time = new Date();
-        timestamps.push(time.toISOString());
-        for (let i = 1; i < coords.length; i++) {
-            const dist = Utils.calculateDistance(prev[0], prev[1], coords[i][0], coords[i][1]); // km
-            const seconds = dist * pace * 60; // pace in min/km
-            totalSeconds += seconds;
-            let nextTime = new Date(time.getTime() + totalSeconds * 1000);
-            timestamps.push(nextTime.toISOString());
-            prev = coords[i];
-        }
-        return timestamps;
-    }
-
-    // --- Run Details Stats Update ---
-    function updateRunStatsPanel() {
-        const dist = Utils.calculateRouteDistance(currentRoute.coordinates);
-        let pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
-        let duration = dist * pace; // min
-        const paceUnit = document.getElementById('paceUnit')?.value || 'min/km';
-        if (paceUnit === 'min/mi') {
-            pace = pace * 0.621371;
-            duration = dist * 0.621371 * pace;
-        }
-        if (document.getElementById('runStatDistance')) {
-            document.getElementById('runStatDistance').textContent = dist.toFixed(2) + (paceUnit === 'min/km' ? ' km' : ' mi');
-        }
-        if (document.getElementById('runStatDuration')) {
-            document.getElementById('runStatDuration').textContent = Utils.formatDuration(duration * 60);
-        }
-        if (document.getElementById('runStatElevation')) {
-            document.getElementById('runStatElevation').textContent = Utils.formatElevation(Utils.calculateElevationGain(currentRoute.elevations));
-        }
-        if (document.getElementById('runStatPace')) {
-            document.getElementById('runStatPace').textContent = parseFloat(document.getElementById('avgPace')?.value || 5.5).toFixed(2);
+            this.hideLoading();
         }
     }
 
-    // --- Update stats after every route change ---
-    function updateRouteInfo() {
-        console.log('updateRouteInfo called. Current route:', currentRoute);
-        updateRunStatsPanel();
-    }
-
-    // --- Mapbox Geocoding Search with Suggestions ---
-    const mapboxToken = window.MAPBOX_TOKEN;
-    const searchInput = document.getElementById('locationSearch');
-    const searchBtn = document.getElementById('searchBtn');
-    const suggestionsBox = document.getElementById('searchSuggestions');
-    let searchResults = [];
-    let activeSuggestion = -1;
-
-    // Fetch suggestions from Mapbox Geocoding API
-    async function fetchSuggestions(query) {
-        if (!query) return [];
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&autocomplete=true&limit=6`;
-        const res = await fetch(url);
-        if (!res.ok) return [];
-        const data = await res.json();
-        return data.features || [];
-    }
-
-    // Debounce utility (if not already present)
-    function debounce(func, wait) {
-        let timeout;
-        return function(...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    }
-
-    // Add loading spinner to suggestions box
-    const loadingSpinner = document.createElement('div');
-    loadingSpinner.className = 'search-loading-spinner';
-    loadingSpinner.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
-
-    // Helper: highlight matching text
-    function highlightMatch(text, query) {
-        if (!query) return text;
-        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
-        return text.replace(regex, '<mark>$1</mark>');
-    }
-
-    // Enhanced search input event: fetch suggestions as you type
-    searchInput.addEventListener('input', debounce(async function () {
-        const query = searchInput.value.trim();
-        if (!query) {
-            suggestionsBox.style.display = 'none';
-            searchResults = [];
+    async createLoop() {
+        if (this.currentRoute.length < 2) {
+            this.showToast('Please draw a route first', 'warning');
             return;
         }
-        suggestionsBox.innerHTML = '';
-        suggestionsBox.appendChild(loadingSpinner);
-        suggestionsBox.style.display = 'block';
-        searchResults = await fetchSuggestions(query);
-        activeSuggestion = -1;
-        renderSuggestions(searchResults, query);
-    }, 250));
 
-    // Enhanced renderSuggestions with icon, type, ARIA, and highlight
-    function renderSuggestions(suggestions, query = '') {
-        suggestionsBox.innerHTML = '';
-        suggestionsBox.setAttribute('role', 'listbox');
-        if (!suggestions.length) {
-            const noRes = document.createElement('div');
-            noRes.className = 'search-no-results';
-            noRes.textContent = 'No results found';
-            suggestionsBox.appendChild(noRes);
-            suggestionsBox.style.display = 'block';
+        try {
+            this.showLoading('Creating loop...');
+            
+            const loopType = document.getElementById('loopType').value;
+            const numLoops = parseInt(document.getElementById('numLoops').value);
+            const gapDistance = parseInt(document.getElementById('gapDistance').value);
+            
+            const loopedRoute = window.RouteTemplates.generateLoopRoute(
+                this.currentRoute, 
+                loopType, 
+                { numLoops, gapDistance }
+            );
+            
+            // Update the current route
+            this.currentRoute = loopedRoute;
+            
+            // Update the polyline
+            if (this.currentPolyline) {
+                this.map.removeLayer(this.currentPolyline);
+            }
+            
+            this.currentPolyline = L.polyline(this.currentRoute, {
+                color: '#e67e22',
+                weight: 5,
+                opacity: 0.8
+            }).addTo(this.map);
+            
+            this.updateStats();
+            this.updateStatus(`Created ${loopType} loop with ${numLoops} repetitions`);
+            this.showToast('Loop created successfully!', 'success');
+            
+        } catch (error) {
+            console.error('Failed to create loop:', error);
+            this.showToast('Failed to create loop', 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async snapRoute() {
+        if (this.currentRoute.length < 2) {
+            this.showToast('Please draw a route first', 'warning');
             return;
         }
-        suggestions.forEach((feature, idx) => {
-            const div = document.createElement('div');
-            div.className = 'search-suggestion' + (idx === activeSuggestion ? ' active' : '');
-            div.setAttribute('role', 'option');
-            div.setAttribute('tabindex', '-1');
-            // Choose icon based on place type
-            let icon = '<i class="fas fa-map-marker-alt"></i>';
-            if (feature.place_type && feature.place_type[0]) {
-                if (feature.place_type[0] === 'address') icon = '<i class="fas fa-home"></i>';
-                if (feature.place_type[0] === 'poi') icon = '<i class="fas fa-landmark"></i>';
-                if (feature.place_type[0] === 'region') icon = '<i class="fas fa-globe"></i>';
-                if (feature.place_type[0] === 'locality') icon = '<i class="fas fa-city"></i>';
-            }
-            div.innerHTML = `${icon} <span class="search-main">${highlightMatch(feature.text, query)}</span><br><span class="search-sub">${highlightMatch(feature.place_name, query)}</span>`;
-            div.addEventListener('mousedown', e => {
-                e.preventDefault();
-                selectSuggestion(idx);
-            });
-            suggestionsBox.appendChild(div);
-        });
-        suggestionsBox.style.display = 'block';
-        // Auto-scroll to keep active suggestion in view
-    }
 
-    // Keyboard navigation for suggestions (improved)
-    searchInput.addEventListener('keydown', function (e) {
-        if (!searchResults.length) return;
-        if (e.key === 'ArrowDown') {
-            activeSuggestion = (activeSuggestion + 1) % searchResults.length;
-            renderSuggestions(searchResults, searchInput.value.trim());
-            e.preventDefault();
-        } else if (e.key === 'ArrowUp') {
-            activeSuggestion = (activeSuggestion - 1 + searchResults.length) % searchResults.length;
-            renderSuggestions(searchResults, searchInput.value.trim());
-            e.preventDefault();
-        } else if (e.key === 'Enter' || e.key === 'Tab') {
-            selectSuggestion(activeSuggestion >= 0 ? activeSuggestion : 0);
-            e.preventDefault();
-        } else if (e.key === 'Escape') {
-            suggestionsBox.style.display = 'none';
-        }
-    });
-
-    // Focus input when clicking search box
-    searchInput.addEventListener('focus', function () {
-        if (searchResults.length) {
-            renderSuggestions(searchResults, searchInput.value.trim());
-        }
-    });
-
-    // Hide suggestions when clicking outside
-    document.addEventListener('mousedown', function (e) {
-        if (!suggestionsBox.contains(e.target) && e.target !== searchInput) {
-            suggestionsBox.style.display = 'none';
-        }
-    });
-
-    // --- Run Details Controls ---
-    const runStatDistance = document.getElementById('runStatDistance');
-    const runStatDuration = document.getElementById('runStatDuration');
-    const runStatElevation = document.getElementById('runStatElevation');
-    const runStatPace = document.getElementById('runStatPace');
-    const paceUnit = document.getElementById('paceUnit');
-    const paceUnitLabel = document.getElementById('paceUnitLabel');
-    const paceUnitLabel2 = document.getElementById('paceUnitLabel2');
-    const avgPace = document.getElementById('avgPace');
-    const avgPaceValue = document.getElementById('avgPaceValue');
-    const paceInconsistency = document.getElementById('paceInconsistency');
-    const paceInconsistencyValue = document.getElementById('paceInconsistencyValue');
-    const activityTypeToggle = document.getElementById('activityTypeToggle');
-    const includeHR = document.getElementById('includeHR');
-    const runName = document.getElementById('runName');
-    const runDate = document.getElementById('runDate');
-    const runStartTime = document.getElementById('runStartTime');
-    const runDesc = document.getElementById('runDesc');
-    const loopRoute = document.getElementById('loopRoute');
-    const loopCountGroup = document.getElementById('loopCountGroup');
-    const loopCount = document.getElementById('loopCount');
-
-    // Set today's date as default
-    if (runDate) {
-        const today = new Date();
-        runDate.value = today.toISOString().slice(0, 10);
-    }
-    if (runStartTime) {
-        const now = new Date();
-        runStartTime.value = now.toTimeString().slice(0,5);
-    }
-
-    // Update pace unit labels
-    function updatePaceUnitLabels() {
-        const unit = paceUnit.value;
-        paceUnitLabel.textContent = unit;
-        paceUnitLabel2.textContent = unit;
-    }
-    if (paceUnit) {
-        paceUnit.addEventListener('change', function() {
-            updatePaceUnitLabels();
-            if (loopRoute && loopRoute.checked && currentRoute.coordinates.length) {
-                updateRouteWithLoops();
+        try {
+            this.showLoading('Snapping route to roads...');
+            
+            const snapMode = document.getElementById('snapMode').value;
+            const snappedCoordinates = await window.RouteSnapping.snapRoute(
+                this.currentRoute, 
+                snapMode
+            );
+            
+            if (snappedCoordinates && snappedCoordinates.length > 0) {
+                this.snappedRoute = snappedCoordinates;
+                
+                // Clear existing snapped route
+                this.drawnItems.clearLayers();
+                
+                // Draw snapped route
+                const snappedPolyline = L.polyline(snappedCoordinates, {
+                    color: '#27ae60',
+                    weight: 6,
+                    opacity: 0.9
+                }).addTo(this.drawnItems);
+                
+                // Add markers for start and end points
+                const startMarker = L.marker(snappedCoordinates[0], {
+                    icon: L.divIcon({
+                        className: 'start-marker',
+                        html: '<div style="background: #27ae60; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">START</div>'
+                    })
+                }).addTo(this.drawnItems);
+                
+                const endMarker = L.marker(snappedCoordinates[snappedCoordinates.length - 1], {
+                    icon: L.divIcon({
+                        className: 'end-marker',
+                        html: '<div style="background: #e74c3c; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">END</div>'
+                    })
+                }).addTo(this.drawnItems);
+                
+                this.updateStats();
+                this.updateStatus('Route snapped to roads successfully');
+                this.showToast('Route snapped to roads!', 'success');
+                
             } else {
-                updateRunStatsPanel();
+                this.showToast('Failed to snap route', 'error');
             }
-        });
-    }
-    updatePaceUnitLabels();
-
-    // Update average pace value
-    if (avgPace) {
-        avgPace.addEventListener('input', function() {
-            avgPaceValue.textContent = parseFloat(avgPace.value).toFixed(2);
-            runStatPace.textContent = parseFloat(avgPace.value).toFixed(2);
-            if (loopRoute && loopRoute.checked && currentRoute.coordinates.length) {
-                updateRouteWithLoops();
-            } else {
-                updateRunStatsPanel();
-            }
-        });
+            
+        } catch (error) {
+            console.error('Failed to snap route:', error);
+            this.showToast('Failed to snap route to roads', 'error');
+        } finally {
+            this.hideLoading();
+        }
     }
 
-    // Update pace inconsistency value
-    if (paceInconsistency) {
-        paceInconsistency.addEventListener('input', function() {
-            paceInconsistencyValue.textContent = paceInconsistency.value + '%';
-        });
+    setMode(mode) {
+        this.mode = mode;
+        
+        // Update UI
+        document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`${mode}Mode`).classList.add('active');
+        
+        // Update map behavior
+        if (mode === 'pan') {
+            this.map.dragging.enable();
+            this.map.doubleClickZoom.enable();
+        } else if (mode === 'draw') {
+            this.map.dragging.enable();
+            this.map.doubleClickZoom.enable();
+        } else if (mode === 'measure') {
+            this.map.dragging.enable();
+            this.map.doubleClickZoom.enable();
+        }
+        
+        this.updateStatus(`Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`);
     }
 
-    // Sync pace slider with Route Settings pace input
-    const paceInput = document.getElementById('pace');
-    if (paceInput && avgPace) {
-        paceInput.addEventListener('input', function() {
-            avgPace.value = paceInput.value;
-            avgPaceValue.textContent = parseFloat(avgPace.value).toFixed(2);
-            runStatPace.textContent = parseFloat(avgPace.value).toFixed(2);
-            updateRunStatsPanel();
-        });
-        avgPace.addEventListener('input', function() {
-            paceInput.value = avgPace.value;
-            if (loopRoute && loopRoute.checked && currentRoute.coordinates.length) {
-                updateRouteWithLoops();
-            }
-        });
+    handleKeyboard(e) {
+        switch (e.key) {
+            case 'Escape':
+                this.clearRoute();
+                break;
+            case 'z':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    this.undoLastPoint();
+                }
+                break;
+            case 'f':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    this.fitToRoute();
+                }
+                break;
+        }
     }
 
-    // Activity type toggle (Run/Bike)
-    if (activityTypeToggle) {
-        activityTypeToggle.addEventListener('change', function() {
-            // You can add logic to change stats/labels for bike mode
-            // For now, just update the color/icon
-            document.querySelector('#runDetailsSection h3 i').className = activityTypeToggle.checked ? 'fas fa-biking' : 'fas fa-running';
-        });
+    updateStats() {
+        const routeToUse = this.snappedRoute || this.currentRoute;
+        
+        if (routeToUse.length < 2) {
+            document.getElementById('distance').textContent = '0.0 km';
+            document.getElementById('duration').textContent = '0:00';
+            document.getElementById('elevation').textContent = '0 m';
+            document.getElementById('pace').textContent = '--';
+            return;
+        }
+        
+        // Calculate distance
+        let totalDistance = 0;
+        for (let i = 1; i < routeToUse.length; i++) {
+            const prev = routeToUse[i - 1];
+            const curr = routeToUse[i];
+            totalDistance += this.calculateDistance(prev, curr);
+        }
+        
+        // Calculate duration (assuming 5:30 min/km pace)
+        const paceMinutes = 5.5;
+        const durationMinutes = totalDistance * paceMinutes;
+        const hours = Math.floor(durationMinutes / 60);
+        const minutes = Math.floor(durationMinutes % 60);
+        
+        // Calculate elevation (placeholder)
+        const elevation = Math.floor(totalDistance * 50); // Rough estimate
+        
+        // Update UI
+        document.getElementById('distance').textContent = `${totalDistance.toFixed(1)} km`;
+        document.getElementById('duration').textContent = `${hours}:${minutes.toString().padStart(2, '0')}`;
+        document.getElementById('elevation').textContent = `${elevation} m`;
+        document.getElementById('pace').textContent = `${paceMinutes}:00`;
     }
 
-    // Loop route controls
-    if (loopRoute) {
-        loopRoute.addEventListener('change', function() {
-            loopCountGroup.style.display = this.checked ? 'block' : 'none';
-            if (currentRoute.coordinates.length) {
-                updateRouteWithLoops();
-            }
-        });
+    calculateDistance(point1, point2) {
+        const R = 6371; // Earth's radius in km
+        const dLat = (point2[0] - point1[0]) * Math.PI / 180;
+        const dLon = (point2[1] - point1[1]) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(point1[0] * Math.PI / 180) * Math.cos(point2[0] * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
     }
 
-    if (loopCount) {
-        loopCount.addEventListener('change', function() {
-            if (currentRoute.coordinates.length && loopRoute.checked) {
-                updateRouteWithLoops();
-            }
-        });
-        // Also update on input for immediate feedback
-        loopCount.addEventListener('input', function() {
-            if (currentRoute.coordinates.length && loopRoute.checked) {
-                updateRouteWithLoops();
-            }
-        });
+    updateStatus(message) {
+        document.getElementById('statusMessage').textContent = message;
     }
 
-    // Function to update route with loops
-    async function updateRouteWithLoops() {
-        console.log('updateRouteWithLoops called. Loops:', loopRoute.checked ? parseInt(loopCount.value) || 1 : 1);
-        if (!window.snappedRoute.length) return;
-        const shouldLoop = loopRoute.checked;
-        const numLoops = shouldLoop ? parseInt(loopCount.value) || 1 : 1;
+    showLoading(message) {
+        document.getElementById('loadingMessage').textContent = message;
+        document.getElementById('loadingOverlay').classList.remove('hidden');
+    }
 
-        let loopedCoords = [];
-        if (shouldLoop && numLoops > 1) {
-            for (let i = 0; i < numLoops; i++) {
-                loopedCoords.push(...window.snappedRoute);
-                loopedCoords.push(...window.snappedRoute.slice().reverse());
+    hideLoading() {
+        document.getElementById('loadingOverlay').classList.add('hidden');
+    }
+
+    showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        
+        toastContainer.appendChild(toast);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
             }
-        } else {
-            loopedCoords = [...window.snappedRoute];
+        }, 3000);
+    }
+
+    async exportGPX() {
+        if (!this.snappedRoute && this.currentRoute.length < 2) {
+            this.showToast('Please draw and snap a route first', 'warning');
+            return;
         }
 
-        // Generate timestamps and elevation for the looped route
-        const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
-        const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
-        const timestamps = generateTimestamps(loopedCoords, pace, startTime);
+        try {
+            const routeToUse = this.snappedRoute || this.currentRoute;
+            const gpxContent = await window.GPXExport.generateGPX(routeToUse);
+            this.downloadFile(gpxContent, 'route.gpx', 'application/gpx+xml');
+            this.showToast('GPX file exported successfully!', 'success');
+        } catch (error) {
+            console.error('Failed to export GPX:', error);
+            this.showToast('Failed to export GPX file', 'error');
+        }
+    }
 
-        let elevations = [];
-        if (window.ElevationService) {
-            elevations = await window.ElevationService.getElevationData(loopedCoords);
+    async exportKML() {
+        if (!this.snappedRoute && this.currentRoute.length < 2) {
+            this.showToast('Please draw and snap a route first', 'warning');
+            return;
         }
 
-        drawnItems.clearLayers();
-        const poly = L.polyline(loopedCoords, {
-            color: isSnapped ? '#3498db' : '#e67e22',
-            weight: 5
-        });
-        drawnItems.addLayer(poly);
-
-        currentRoute = {
-            coordinates: loopedCoords,
-            elevations: elevations,
-            timestamps: timestamps,
-            layer: poly
-        };
-
-        updateRouteInfo(); // Ensure run details are updated after looping
+        try {
+            const routeToUse = this.snappedRoute || this.currentRoute;
+            const kmlContent = await window.GPXExport.generateKML(routeToUse);
+            this.downloadFile(kmlContent, 'route.kml', 'application/vnd.google-earth.kml+xml');
+            this.showToast('KML file exported successfully!', 'success');
+        } catch (error) {
+            console.error('Failed to export KML:', error);
+            this.showToast('Failed to export KML file', 'error');
+        }
     }
+
+    async exportJSON() {
+        if (!this.snappedRoute && this.currentRoute.length < 2) {
+            this.showToast('Please draw and snap a route first', 'warning');
+            return;
+        }
+
+        try {
+            const routeToUse = this.snappedRoute || this.currentRoute;
+            const jsonContent = JSON.stringify({
+                route: routeToUse,
+                metadata: {
+                    distance: document.getElementById('distance').textContent,
+                    duration: document.getElementById('duration').textContent,
+                    elevation: document.getElementById('elevation').textContent,
+                    exportDate: new Date().toISOString()
+                }
+            }, null, 2);
+            
+            this.downloadFile(jsonContent, 'route.json', 'application/json');
+            this.showToast('JSON file exported successfully!', 'success');
+        } catch (error) {
+            console.error('Failed to export JSON:', error);
+            this.showToast('Failed to export JSON file', 'error');
+        }
+    }
+
+    downloadFile(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    window.routeGenerator = new GPXRouteGenerator();
 }); 

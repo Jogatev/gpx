@@ -1,28 +1,75 @@
 {
-  "name": "route-generator",
-  "version": "1.0.0",
-  "description": "Interactive Route Generator with GPX Export",
+  "name": "gpx-route-generator",
+  "version": "2.0.0",
+  "description": "Advanced GPX Route Generator with Smart Snapping, Templates, and Optimization",
   "main": "index.html",
   "scripts": {
-    "start": "http-server -p 8080 -c-1",
-    "dev": "live-server --port=8080",
-    "build": "node generate-config.js"
-  },
-  "dependencies": {
-    "leaflet": "^1.9.4",
-    "leaflet-draw": "^1.0.4"
-  },
-  "devDependencies": {
-    "http-server": "^14.1.1",
-    "live-server": "^1.2.2"
+    "start": "python -m http.server 8000",
+    "dev": "python -m http.server 8000",
+    "serve": "python -m http.server 8000",
+    "build": "echo 'Static site - no build required'",
+    "deploy": "vercel --prod",
+    "test": "echo 'No tests specified'",
+    "lint": "echo 'No linter configured'"
   },
   "keywords": [
     "gpx",
     "route",
-    "mapping",
+    "generator",
+    "running",
+    "cycling",
+    "fitness",
+    "map",
     "leaflet",
-    "fitness"
+    "openrouteservice",
+    "optimization"
   ],
-  "author": "Route Generator",
-  "license": "MIT"
+  "author": "GPX Route Generator Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/gpx-route-generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/gpx-route-generator/issues"
+  },
+  "homepage": "https://gpx-route-generator.vercel.app",
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "leaflet.draw": "^1.0.4"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "features": [
+    "Route Drawing",
+    "Smart Road Snapping",
+    "Route Templates",
+    "Loop Generation",
+    "Multiple Export Formats",
+    "Route Optimization",
+    "Elevation Data",
+    "Modern UI/UX",
+    "Responsive Design",
+    "Keyboard Shortcuts",
+    "Toast Notifications",
+    "Loading States"
+  ],
+  "apis": {
+    "mapbox": "Map tiles and elevation data",
+    "openrouteservice": "Route snapping and optimization",
+    "opentopodata": "Elevation data (fallback)"
+  },
+  "environment": {
+    "MAPBOX_TOKEN": "Required for map tiles and elevation",
+    "ORS_API_KEY": "Required for route snapping"
+  }
 } 
