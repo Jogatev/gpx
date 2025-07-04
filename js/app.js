@@ -33,10 +33,10 @@ class GPXRouteGenerator {
         // Initialize map with Mapbox tiles
         this.map = L.map('map', {
             center: [37.7749, -122.4194], // San Francisco
-            zoom: 13,
-            zoomControl: true,
-            attributionControl: true
-        });
+        zoom: 13,
+        zoomControl: true,
+        attributionControl: true
+    });
 
         // Add Mapbox tiles
         L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token={accessToken}', {
@@ -55,44 +55,63 @@ class GPXRouteGenerator {
     }
 
     setupEventListeners() {
+        // Helper function to safely add event listeners
+        const addEventListener = (id, event, handler) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener(event, handler);
+            } else {
+                console.warn(`Element with id '${id}' not found`);
+            }
+        };
+
         // Quick Actions
-        document.getElementById('clearRoute').addEventListener('click', () => this.clearRoute());
-        document.getElementById('undoLast').addEventListener('click', () => this.undoLastPoint());
-        document.getElementById('fitToRoute').addEventListener('click', () => this.fitToRoute());
+        addEventListener('clearRoute', 'click', () => this.clearRoute());
+        addEventListener('undoLast', 'click', () => this.undoLastPoint());
+        addEventListener('fitToRoute', 'click', () => this.fitToRoute());
 
         // Template Actions
-        document.getElementById('applyTemplate').addEventListener('click', () => this.applySelectedTemplate());
+        addEventListener('applyTemplate', 'click', () => this.applySelectedTemplate());
 
         // Loop Configuration
-        document.getElementById('createLoop').addEventListener('click', () => this.createLoop());
+        addEventListener('createLoop', 'click', () => this.createLoop());
 
         // Snapping Options
-        document.getElementById('snapRoute').addEventListener('click', () => this.snapRoute());
-        document.getElementById('autoSnap').addEventListener('change', (e) => {
+        addEventListener('snapRoute', 'click', () => this.snapRoute());
+        addEventListener('autoSnap', 'change', (e) => {
             this.autoSnap = e.target.checked;
         });
 
         // Export Options
-        document.getElementById('exportGPX').addEventListener('click', () => this.exportGPX());
-        document.getElementById('exportKML').addEventListener('click', () => this.exportKML());
-        document.getElementById('exportJSON').addEventListener('click', () => this.exportJSON());
+        addEventListener('exportGPX', 'click', () => this.exportGPX());
+        addEventListener('exportKML', 'click', () => this.exportKML());
+        addEventListener('exportJSON', 'click', () => this.exportJSON());
 
         // Map Controls
-        document.getElementById('drawMode').addEventListener('click', () => this.setMode('draw'));
-        document.getElementById('panMode').addEventListener('click', () => this.setMode('pan'));
-        document.getElementById('measureMode').addEventListener('click', () => this.setMode('measure'));
+        addEventListener('drawMode', 'click', () => this.setMode('draw'));
+        addEventListener('panMode', 'click', () => this.setMode('pan'));
+        addEventListener('measureMode', 'click', () => this.setMode('measure'));
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
     }
 
     setupUI() {
-        // Set default values
-        document.getElementById('runDate').value = new Date().toISOString().split('T')[0];
-        document.getElementById('runStartTime').value = new Date().toTimeString().slice(0, 5);
+        // Set default values (only if elements exist)
+        const runDateElement = document.getElementById('runDate');
+        const runStartTimeElement = document.getElementById('runStartTime');
+        const autoSnapElement = document.getElementById('autoSnap');
+        
+        if (runDateElement) {
+            runDateElement.value = new Date().toISOString().split('T')[0];
+        }
+        
+        if (runStartTimeElement) {
+            runStartTimeElement.value = new Date().toTimeString().slice(0, 5);
+        }
         
         // Initialize auto-snap
-        this.autoSnap = document.getElementById('autoSnap').checked;
+        this.autoSnap = autoSnapElement ? autoSnapElement.checked : true;
         
         // Update status
         this.updateStatus('Ready to draw your route');
@@ -111,8 +130,11 @@ class GPXRouteGenerator {
 
     handleMouseMove(e) {
         const latlng = e.latlng;
-        document.getElementById('coordinates').textContent = 
-            `Lat: ${latlng.lat.toFixed(6)}, Lng: ${latlng.lng.toFixed(6)}`;
+        const coordinatesElement = document.getElementById('coordinates');
+        if (coordinatesElement) {
+            coordinatesElement.textContent = 
+                `Lat: ${latlng.lat.toFixed(6)}, Lng: ${latlng.lng.toFixed(6)}`;
+        }
     }
 
     addPoint(latlng) {
@@ -181,6 +203,11 @@ class GPXRouteGenerator {
 
     async applySelectedTemplate() {
         const templateSelect = document.getElementById('templateSelect');
+        if (!templateSelect) {
+            this.showToast('Template selector not found', 'error');
+            return;
+        }
+        
         const templateName = templateSelect.value;
         
         if (!templateName) {
@@ -227,9 +254,18 @@ class GPXRouteGenerator {
         try {
             this.showLoading('Creating loop...');
             
-            const loopType = document.getElementById('loopType').value;
-            const numLoops = parseInt(document.getElementById('numLoops').value);
-            const gapDistance = parseInt(document.getElementById('gapDistance').value);
+            const loopTypeElement = document.getElementById('loopType');
+            const numLoopsElement = document.getElementById('numLoops');
+            const gapDistanceElement = document.getElementById('gapDistance');
+            
+            if (!loopTypeElement || !numLoopsElement || !gapDistanceElement) {
+                this.showToast('Loop configuration elements not found', 'error');
+                return;
+            }
+            
+            const loopType = loopTypeElement.value;
+            const numLoops = parseInt(numLoopsElement.value);
+            const gapDistance = parseInt(gapDistanceElement.value);
             
             const loopedRoute = window.RouteTemplates.generateLoopRoute(
                 this.currentRoute, 
@@ -272,7 +308,13 @@ class GPXRouteGenerator {
         try {
             this.showLoading('Snapping route to roads...');
             
-            const snapMode = document.getElementById('snapMode').value;
+            const snapModeElement = document.getElementById('snapMode');
+            if (!snapModeElement) {
+                this.showToast('Snap mode selector not found', 'error');
+            return;
+        }
+            
+            const snapMode = snapModeElement.value;
             const snappedCoordinates = await window.RouteSnapping.snapRoute(
                 this.currentRoute, 
                 snapMode
@@ -327,7 +369,10 @@ class GPXRouteGenerator {
         
         // Update UI
         document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`${mode}Mode`).classList.add('active');
+        const modeButton = document.getElementById(`${mode}Mode`);
+        if (modeButton) {
+            modeButton.classList.add('active');
+        }
         
         // Update map behavior
         if (mode === 'pan') {
@@ -368,10 +413,15 @@ class GPXRouteGenerator {
         const routeToUse = this.snappedRoute || this.currentRoute;
         
         if (routeToUse.length < 2) {
-            document.getElementById('distance').textContent = '0.0 km';
-            document.getElementById('duration').textContent = '0:00';
-            document.getElementById('elevation').textContent = '0 m';
-            document.getElementById('pace').textContent = '--';
+            const distanceElement = document.getElementById('distance');
+            const durationElement = document.getElementById('duration');
+            const elevationElement = document.getElementById('elevation');
+            const paceElement = document.getElementById('pace');
+            
+            if (distanceElement) distanceElement.textContent = '0.0 km';
+            if (durationElement) durationElement.textContent = '0:00';
+            if (elevationElement) elevationElement.textContent = '0 m';
+            if (paceElement) paceElement.textContent = '--';
             return;
         }
         
@@ -393,10 +443,15 @@ class GPXRouteGenerator {
         const elevation = Math.floor(totalDistance * 50); // Rough estimate
         
         // Update UI
-        document.getElementById('distance').textContent = `${totalDistance.toFixed(1)} km`;
-        document.getElementById('duration').textContent = `${hours}:${minutes.toString().padStart(2, '0')}`;
-        document.getElementById('elevation').textContent = `${elevation} m`;
-        document.getElementById('pace').textContent = `${paceMinutes}:00`;
+        const distanceElement = document.getElementById('distance');
+        const durationElement = document.getElementById('duration');
+        const elevationElement = document.getElementById('elevation');
+        const paceElement = document.getElementById('pace');
+        
+        if (distanceElement) distanceElement.textContent = `${totalDistance.toFixed(1)} km`;
+        if (durationElement) durationElement.textContent = `${hours}:${minutes.toString().padStart(2, '0')}`;
+        if (elevationElement) elevationElement.textContent = `${elevation} m`;
+        if (paceElement) paceElement.textContent = `${paceMinutes}:00`;
     }
 
     calculateDistance(point1, point2) {
@@ -411,20 +466,38 @@ class GPXRouteGenerator {
     }
 
     updateStatus(message) {
-        document.getElementById('statusMessage').textContent = message;
+        const statusElement = document.getElementById('statusMessage');
+        if (statusElement) {
+            statusElement.textContent = message;
+        }
     }
 
     showLoading(message) {
-        document.getElementById('loadingMessage').textContent = message;
-        document.getElementById('loadingOverlay').classList.remove('hidden');
+        const loadingMessageElement = document.getElementById('loadingMessage');
+        const loadingOverlayElement = document.getElementById('loadingOverlay');
+        
+        if (loadingMessageElement) {
+            loadingMessageElement.textContent = message;
+        }
+        if (loadingOverlayElement) {
+            loadingOverlayElement.classList.remove('hidden');
+        }
     }
 
     hideLoading() {
-        document.getElementById('loadingOverlay').classList.add('hidden');
+        const loadingOverlayElement = document.getElementById('loadingOverlay');
+        if (loadingOverlayElement) {
+            loadingOverlayElement.classList.add('hidden');
+        }
     }
 
     showToast(message, type = 'info') {
         const toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) {
+            console.warn('Toast container not found');
+            return;
+        }
+        
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.textContent = message;
@@ -481,12 +554,16 @@ class GPXRouteGenerator {
 
         try {
             const routeToUse = this.snappedRoute || this.currentRoute;
+            const distanceElement = document.getElementById('distance');
+            const durationElement = document.getElementById('duration');
+            const elevationElement = document.getElementById('elevation');
+            
             const jsonContent = JSON.stringify({
                 route: routeToUse,
                 metadata: {
-                    distance: document.getElementById('distance').textContent,
-                    duration: document.getElementById('duration').textContent,
-                    elevation: document.getElementById('elevation').textContent,
+                    distance: distanceElement ? distanceElement.textContent : '0.0 km',
+                    duration: durationElement ? durationElement.textContent : '0:00',
+                    elevation: elevationElement ? elevationElement.textContent : '0 m',
                     exportDate: new Date().toISOString()
                 }
             }, null, 2);
