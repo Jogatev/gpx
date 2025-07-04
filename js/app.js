@@ -486,98 +486,70 @@ document.addEventListener('DOMContentLoaded', function () {
         const shouldLoop = loopRoute.checked;
         const numLoops = shouldLoop ? parseInt(loopCount.value) || 1 : 1;
         
-        if (shouldLoop && numLoops > 1) {
-            // Create backtracking coordinates
-            const originalCoords = [...currentRoute.coordinates];
-            const backtrackedCoords = [];
-            
-            for (let i = 0; i < numLoops; i++) {
-                if (i > 0) {
-                    // Add a small gap between loops (optional)
-                    const lastCoord = backtrackedCoords[backtrackedCoords.length - 1];
-                    const firstCoord = originalCoords[0];
-                    const gapCoords = createGapCoords(lastCoord, firstCoord, 50); // 50m gap
-                    backtrackedCoords.push(...gapCoords);
-                }
-                
-                if (i % 2 === 0) {
-                    // Forward direction
-                    backtrackedCoords.push(...originalCoords);
-                } else {
-                    // Backward direction (reverse the coordinates)
-                    backtrackedCoords.push(...originalCoords.slice().reverse());
-                }
-            }
-            
-            // Update current route with backtracked coordinates
-            const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
-            const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
-            const timestamps = generateTimestamps(backtrackedCoords, pace, startTime);
-            
-            // Get elevation data for backtracked route
-            let elevations = [];
-            if (window.ElevationService) {
-                // Duplicate elevation data for loops, reversing for backtracking
-                elevations = [...currentRoute.elevations];
-                for (let i = 1; i < numLoops; i++) {
+        async function processAndDrawLoopedRoute() {
+            let backtrackedCoords;
+            if (shouldLoop && numLoops > 1) {
+                // Create backtracking coordinates
+                const originalCoords = [...currentRoute.coordinates];
+                backtrackedCoords = [];
+                for (let i = 0; i < numLoops; i++) {
+                    if (i > 0) {
+                        // Add a small gap between loops (optional)
+                        const lastCoord = backtrackedCoords[backtrackedCoords.length - 1];
+                        const firstCoord = originalCoords[0];
+                        const gapCoords = createGapCoords(lastCoord, firstCoord, 50); // 50m gap
+                        backtrackedCoords.push(...gapCoords);
+                    }
                     if (i % 2 === 0) {
-                        // Forward direction - add elevation data as is
-                        elevations.push(...currentRoute.elevations);
+                        // Forward direction
+                        backtrackedCoords.push(...originalCoords);
                     } else {
-                        // Backward direction - reverse elevation data
-                        elevations.push(...currentRoute.elevations.slice().reverse());
+                        // Backward direction (reverse the coordinates)
+                        backtrackedCoords.push(...originalCoords.slice().reverse());
                     }
                 }
+            } else {
+                // Reset to original route
+                backtrackedCoords = currentRoute.coordinates.slice(0, Math.ceil(currentRoute.coordinates.length / (parseInt(loopCount.value) || 1)));
             }
-            
-            // Update the route layer
-            drawnItems.clearLayers();
-            const poly = L.polyline(backtrackedCoords, { 
-                color: isSnapped ? '#3498db' : '#e67e22', 
-                weight: 5 
-            });
-            drawnItems.addLayer(poly);
-            
-            // Update current route state
-            currentRoute = {
-                coordinates: backtrackedCoords,
-                elevations: elevations,
-                timestamps: timestamps,
-                layer: poly
-            };
-            
-            updateRouteInfo();
-        } else {
-            // Reset to original route
-            const originalCoords = currentRoute.coordinates.slice(0, Math.ceil(currentRoute.coordinates.length / (parseInt(loopCount.value) || 1)));
+
+            // Snap the final looped route to roads/paths (walking)
+            let snappedCoords = backtrackedCoords;
+            if (window.RouteSnappingService) {
+                snappedCoords = await window.RouteSnappingService.snapToRoads(backtrackedCoords, { profile: 'walking' });
+            }
+
+            // Update current route with snapped, looped coordinates
             const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
             const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
-            const timestamps = generateTimestamps(originalCoords, pace, startTime);
-            
-            // Get elevation data for original route
+            const timestamps = generateTimestamps(snappedCoords, pace, startTime);
+
+            // Get elevation data for snapped, looped route
             let elevations = [];
             if (window.ElevationService) {
-                elevations = currentRoute.elevations.slice(0, Math.ceil(currentRoute.elevations.length / (parseInt(loopCount.value) || 1)));
+                elevations = await window.ElevationService.getElevationData(snappedCoords);
             }
-            
+
             // Update the route layer
             drawnItems.clearLayers();
-            const poly = L.polyline(originalCoords, { 
+            const poly = L.polyline(snappedCoords, { 
                 color: isSnapped ? '#3498db' : '#e67e22', 
                 weight: 5 
             });
             drawnItems.addLayer(poly);
-            
+
             // Update current route state
             currentRoute = {
-                coordinates: originalCoords,
+                coordinates: snappedCoords,
                 elevations: elevations,
                 timestamps: timestamps,
                 layer: poly
             };
-            
+
             updateRouteInfo();
         }
+        // Call the async function
+        processAndDrawLoopedRoute();
     }
 
     // Helper function to create gap coordinates between loops
