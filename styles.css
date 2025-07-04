@@ -663,6 +663,14 @@ input:checked + .slider:before {
     font-size: 0.95em;
 }
 
+/* Loop count input specific styling */
+#loopCount {
+    width: 80px !important;
+    text-align: center;
+    font-weight: 600;
+    color: #3498db;
+}
+
 .align-path-btn {
     width: 100%;
     margin: 1em 0 0.5em 0;

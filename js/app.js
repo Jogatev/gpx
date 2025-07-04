@@ -176,7 +176,14 @@ document.addEventListener('DOMContentLoaded', function () {
             timestamps,
             layer: poly
         };
-        updateRouteInfo();
+        
+        // Apply loops if enabled
+        if (loopRoute && loopRoute.checked) {
+            updateRouteWithLoops();
+        } else {
+            updateRouteInfo();
+        }
+        
         Utils.hideLoading();
     }
 
@@ -248,34 +255,60 @@ document.addEventListener('DOMContentLoaded', function () {
         return data.features || [];
     }
 
-    // Add clear (X) button to search input
-    const clearBtn = document.createElement('button');
-    clearBtn.type = 'button';
-    clearBtn.innerHTML = '<i class="fas fa-times"></i>';
-    clearBtn.className = 'search-clear-btn';
-    clearBtn.style.display = 'none';
-    searchInput.parentNode.insertBefore(clearBtn, searchInput.nextSibling);
+    // Debounce utility (if not already present)
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
 
-    searchInput.addEventListener('input', function () {
-        clearBtn.style.display = searchInput.value ? 'block' : 'none';
-    });
-    clearBtn.addEventListener('click', function () {
-        searchInput.value = '';
-        clearBtn.style.display = 'none';
-        suggestionsBox.style.display = 'none';
-        searchInput.focus();
-    });
+    // Add loading spinner to suggestions box
+    const loadingSpinner = document.createElement('div');
+    loadingSpinner.className = 'search-loading-spinner';
+    loadingSpinner.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
 
-    // Enhanced renderSuggestions with icon and type
-    function renderSuggestions(suggestions) {
-        suggestionsBox.innerHTML = '';
-        if (!suggestions.length) {
+    // Helper: highlight matching text
+    function highlightMatch(text, query) {
+        if (!query) return text;
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
+        return text.replace(regex, '<mark>$1</mark>');
+    }
+
+    // Enhanced search input event: fetch suggestions as you type
+    searchInput.addEventListener('input', debounce(async function () {
+        const query = searchInput.value.trim();
+        if (!query) {
             suggestionsBox.style.display = 'none';
+            searchResults = [];
+            return;
+        }
+        suggestionsBox.innerHTML = '';
+        suggestionsBox.appendChild(loadingSpinner);
+        suggestionsBox.style.display = 'block';
+        searchResults = await fetchSuggestions(query);
+        activeSuggestion = -1;
+        renderSuggestions(searchResults, query);
+    }, 250));
+
+    // Enhanced renderSuggestions with icon, type, ARIA, and highlight
+    function renderSuggestions(suggestions, query = '') {
+        suggestionsBox.innerHTML = '';
+        suggestionsBox.setAttribute('role', 'listbox');
+        if (!suggestions.length) {
+            const noRes = document.createElement('div');
+            noRes.className = 'search-no-results';
+            noRes.textContent = 'No results found';
+            suggestionsBox.appendChild(noRes);
+            suggestionsBox.style.display = 'block';
             return;
         }
         suggestions.forEach((feature, idx) => {
             const div = document.createElement('div');
             div.className = 'search-suggestion' + (idx === activeSuggestion ? ' active' : '');
+            div.setAttribute('role', 'option');
+            div.setAttribute('tabindex', '-1');
             // Choose icon based on place type
             let icon = '<i class="fas fa-map-marker-alt"></i>';
             if (feature.place_type && feature.place_type[0]) {
@@ -284,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (feature.place_type[0] === 'region') icon = '<i class="fas fa-globe"></i>';
                 if (feature.place_type[0] === 'locality') icon = '<i class="fas fa-city"></i>';
             }
-            div.innerHTML = `${icon} <span class="search-main">${feature.text}</span><br><span class="search-sub">${feature.place_name}</span>`;
+            div.innerHTML = `${icon} <span class="search-main">${highlightMatch(feature.text, query)}</span><br><span class="search-sub">${highlightMatch(feature.place_name, query)}</span>`;
             div.addEventListener('mousedown', e => {
                 e.preventDefault();
                 selectSuggestion(idx);
@@ -292,35 +325,36 @@ document.addEventListener('DOMContentLoaded', function () {
             suggestionsBox.appendChild(div);
         });
         suggestionsBox.style.display = 'block';
+        // Auto-scroll to keep active suggestion in view
+        setTimeout(() => {
+            const active = suggestionsBox.querySelector('.search-suggestion.active');
+            if (active) active.scrollIntoView({ block: 'nearest' });
+        }, 0);
     }
 
-    // Select a suggestion
-    function selectSuggestion(idx) {
-        const feature = searchResults[idx];
-        if (!feature) return;
-        // Pan/zoom to location
-        map.setView([feature.center[1], feature.center[0]], 16);
-        // Optionally add a marker
-        L.marker([feature.center[1], feature.center[0]]).addTo(map);
-        // Hide suggestions
-        suggestionsBox.style.display = 'none';
-        searchInput.value = feature.place_name;
-    }
-
-    // On Enter or search icon, always go to the top suggestion
+    // Keyboard navigation for suggestions (improved)
     searchInput.addEventListener('keydown', function (e) {
         if (!searchResults.length) return;
-        if (e.key === 'Enter') {
+        if (e.key === 'ArrowDown') {
+            activeSuggestion = (activeSuggestion + 1) % searchResults.length;
+            renderSuggestions(searchResults, searchInput.value.trim());
+            e.preventDefault();
+        } else if (e.key === 'ArrowUp') {
+            activeSuggestion = (activeSuggestion - 1 + searchResults.length) % searchResults.length;
+            renderSuggestions(searchResults, searchInput.value.trim());
+            e.preventDefault();
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
             selectSuggestion(activeSuggestion >= 0 ? activeSuggestion : 0);
             e.preventDefault();
+        } else if (e.key === 'Escape') {
+            suggestionsBox.style.display = 'none';
         }
     });
-    searchBtn.addEventListener('click', async function () {
-        const query = searchInput.value.trim();
-        if (!query) return;
-        searchResults = await fetchSuggestions(query);
+
+    // Focus input when clicking search box
+    searchInput.addEventListener('focus', function () {
         if (searchResults.length) {
-            selectSuggestion(0);
+            renderSuggestions(searchResults, searchInput.value.trim());
         }
     });
 
@@ -349,6 +383,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const runDate = document.getElementById('runDate');
     const runStartTime = document.getElementById('runStartTime');
     const runDesc = document.getElementById('runDesc');
+    const loopRoute = document.getElementById('loopRoute');
+    const loopCountGroup = document.getElementById('loopCountGroup');
+    const loopCount = document.getElementById('loopCount');
 
     // Set today's date as default
     if (runDate) {
@@ -369,7 +406,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (paceUnit) {
         paceUnit.addEventListener('change', function() {
             updatePaceUnitLabels();
-            updateRunStatsPanel();
+            if (loopRoute && loopRoute.checked && currentRoute.coordinates.length) {
+                updateRouteWithLoops();
+            } else {
+                updateRunStatsPanel();
+            }
         });
     }
     updatePaceUnitLabels();
@@ -379,7 +420,11 @@ document.addEventListener('DOMContentLoaded', function () {
         avgPace.addEventListener('input', function() {
             avgPaceValue.textContent = parseFloat(avgPace.value).toFixed(2);
             runStatPace.textContent = parseFloat(avgPace.value).toFixed(2);
-            updateRunStatsPanel();
+            if (loopRoute && loopRoute.checked && currentRoute.coordinates.length) {
+                updateRouteWithLoops();
+            } else {
+                updateRunStatsPanel();
+            }
         });
     }
 
@@ -401,6 +446,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         avgPace.addEventListener('input', function() {
             paceInput.value = avgPace.value;
+            if (loopRoute && loopRoute.checked && currentRoute.coordinates.length) {
+                updateRouteWithLoops();
+            }
         });
     }
 
@@ -411,5 +459,127 @@ document.addEventListener('DOMContentLoaded', function () {
             // For now, just update the color/icon
             document.querySelector('#runDetailsSection h3 i').className = activityTypeToggle.checked ? 'fas fa-biking' : 'fas fa-running';
         });
+    }
+
+    // Loop route controls
+    if (loopRoute) {
+        loopRoute.addEventListener('change', function() {
+            loopCountGroup.style.display = this.checked ? 'block' : 'none';
+            if (currentRoute.coordinates.length) {
+                updateRouteWithLoops();
+            }
+        });
+    }
+
+    if (loopCount) {
+        loopCount.addEventListener('change', function() {
+            if (currentRoute.coordinates.length && loopRoute.checked) {
+                updateRouteWithLoops();
+            }
+        });
+    }
+
+    // Function to update route with loops
+    function updateRouteWithLoops() {
+        if (!currentRoute.coordinates.length) return;
+        
+        const shouldLoop = loopRoute.checked;
+        const numLoops = shouldLoop ? parseInt(loopCount.value) || 1 : 1;
+        
+        if (shouldLoop && numLoops > 1) {
+            // Create looped coordinates
+            const originalCoords = [...currentRoute.coordinates];
+            const loopedCoords = [];
+            
+            for (let i = 0; i < numLoops; i++) {
+                if (i > 0) {
+                    // Add a small gap between loops (optional)
+                    const lastCoord = loopedCoords[loopedCoords.length - 1];
+                    const firstCoord = originalCoords[0];
+                    const gapCoords = createGapCoords(lastCoord, firstCoord, 50); // 50m gap
+                    loopedCoords.push(...gapCoords);
+                }
+                loopedCoords.push(...originalCoords);
+            }
+            
+            // Update current route with looped coordinates
+            const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
+            const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
+            const timestamps = generateTimestamps(loopedCoords, pace, startTime);
+            
+            // Get elevation data for looped route
+            let elevations = [];
+            if (window.ElevationService) {
+                // For now, we'll duplicate elevation data for loops
+                // In a more sophisticated implementation, you might want to fetch elevation for the full route
+                elevations = [...currentRoute.elevations];
+                for (let i = 1; i < numLoops; i++) {
+                    elevations.push(...currentRoute.elevations);
+                }
+            }
+            
+            // Update the route layer
+            drawnItems.clearLayers();
+            const poly = L.polyline(loopedCoords, { 
+                color: isSnapped ? '#3498db' : '#e67e22', 
+                weight: 5 
+            });
+            drawnItems.addLayer(poly);
+            
+            // Update current route state
+            currentRoute = {
+                coordinates: loopedCoords,
+                elevations: elevations,
+                timestamps: timestamps,
+                layer: poly
+            };
+            
+            updateRouteInfo();
+        } else {
+            // Reset to original route
+            const originalCoords = currentRoute.coordinates.slice(0, Math.ceil(currentRoute.coordinates.length / (parseInt(loopCount.value) || 1)));
+            const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
+            const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
+            const timestamps = generateTimestamps(originalCoords, pace, startTime);
+            
+            // Get elevation data for original route
+            let elevations = [];
+            if (window.ElevationService) {
+                elevations = currentRoute.elevations.slice(0, Math.ceil(currentRoute.elevations.length / (parseInt(loopCount.value) || 1)));
+            }
+            
+            // Update the route layer
+            drawnItems.clearLayers();
+            const poly = L.polyline(originalCoords, { 
+                color: isSnapped ? '#3498db' : '#e67e22', 
+                weight: 5 
+            });
+            drawnItems.addLayer(poly);
+            
+            // Update current route state
+            currentRoute = {
+                coordinates: originalCoords,
+                elevations: elevations,
+                timestamps: timestamps,
+                layer: poly
+            };
+            
+            updateRouteInfo();
+        }
+    }
+
+    // Helper function to create gap coordinates between loops
+    function createGapCoords(startCoord, endCoord, gapDistance) {
+        const gapCoords = [];
+        const steps = 3; // Number of intermediate points
+        
+        for (let i = 1; i <= steps; i++) {
+            const ratio = i / (steps + 1);
+            const lat = startCoord[0] + (endCoord[0] - startCoord[0]) * ratio;
+            const lng = startCoord[1] + (endCoord[1] - startCoord[1]) * ratio;
+            gapCoords.push([lat, lng]);
+        }
+        
+        return gapCoords;
     }
 }); 
