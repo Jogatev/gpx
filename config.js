@@ -1,0 +1,1 @@
+window.ORS_API_KEY = (typeof process !== 'undefined' && process.env && process.env.ORS_API_KEY) ? process.env.ORS_API_KEY : window.ORS_API_KEY || ''; 

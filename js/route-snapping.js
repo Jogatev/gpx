@@ -31,7 +31,7 @@ class RouteSnappingService {
             profile = 'walking';
         }
 
-        // Limit waypoints for Mapbox/OSRM to 10 (start, end, and evenly spaced intermediates)
+        // Limit waypoints for Mapbox/OSRM/ORS to 10 (start, end, and evenly spaced intermediates)
         let snappedInputCoords = coordinates;
         if (coordinates.length > 10) {
             snappedInputCoords = [];
@@ -51,19 +51,22 @@ class RouteSnappingService {
 
         try {
             Utils.showLoading('Snapping route to roads...');
-            
-            // Try Mapbox Directions first for all profiles
-            let snappedCoords = await this.tryMapbox(snappedInputCoords, { ...options, profile });
-            
-            // Fallback to OSRM if Mapbox fails
+            let snappedCoords = null;
+            // Try ORS first for walking
+            if (profile === 'walking') {
+                snappedCoords = await this.tryORS(snappedInputCoords, { ...options, profile });
+            }
+            // Fallback to Mapbox Directions
+            if (!snappedCoords || snappedCoords.length === 0) {
+                snappedCoords = await this.tryMapbox(snappedInputCoords, { ...options, profile });
+            }
+            // Fallback to OSRM
             if (!snappedCoords || snappedCoords.length === 0) {
                 snappedCoords = await this.tryOSRM(snappedInputCoords, { ...options, profile });
             }
-            
             if (!snappedCoords || snappedCoords.length === 0) {
                 snappedCoords = await this.tryGraphHopper(snappedInputCoords, { ...options, profile });
             }
-            
             if (!snappedCoords || snappedCoords.length === 0) {
                 // For walking, use optimizeForWalking for a more realistic fallback
                 if (profile === 'walking') {
@@ -72,18 +75,14 @@ class RouteSnappingService {
                     snappedCoords = await this.simulateRoadSnapping(coordinates, { ...options, profile });
                 }
             }
-
             // Simplify route if requested
             if (simplify && snappedCoords.length > maxPoints) {
                 snappedCoords = this.simplifyRoute(snappedCoords, maxPoints);
             }
-
             // Cache the result
             this.cacheResult(cacheKey, snappedCoords);
-            
             Utils.hideLoading();
             return snappedCoords;
-            
         } catch (error) {
             console.error('Error snapping route to roads:', error);
             Utils.hideLoading();
@@ -408,6 +407,46 @@ class RouteSnappingService {
             return null;
         } catch (error) {
             console.warn('Mapbox Directions failed:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Try to snap route using OpenRouteService (ORS)
+     * @param {Array} coordinates - Array of [lat, lng] coordinates
+     * @param {Object} options - Snapping options
+     * @returns {Promise<Array>} Snapped coordinates
+     */
+    async tryORS(coordinates, options = {}) {
+        try {
+            // Set your ORS API key in config.js as: window.ORS_API_KEY = 'YOUR_KEY_HERE';
+            const ORS_API_KEY = window.ORS_API_KEY;
+            if (!ORS_API_KEY) throw new Error('ORS API key not set. Please set window.ORS_API_KEY in config.js');
+            const profile = options.profile || 'foot-walking';
+            // ORS expects GeoJSON LineString coordinates [lng, lat]
+            const geojson = {
+                coordinates: coordinates.map(c => [c[1], c[0]]),
+                format: 'geojson'
+            };
+            const response = await fetch(
+                `https://api.openrouteservice.org/v2/directions/foot-walking/geojson`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': ORS_API_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(geojson)
+                }
+            );
+            if (!response.ok) throw new Error(`ORS HTTP ${response.status}`);
+            const data = await response.json();
+            if (data && data.features && data.features.length > 0) {
+                return data.features[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+            }
+            return null;
+        } catch (error) {
+            console.warn('ORS failed:', error);
             return null;
         }
     }
