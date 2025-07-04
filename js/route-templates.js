@@ -165,105 +165,35 @@ class RouteTemplates {
     }
 
     /**
-     * Generate route based on loop type
+     * Generate repeated laps route (true lap behavior)
      */
-    generateLoopRoute(baseCoordinates, loopType, options = {}) {
-        switch (loopType) {
-            case 'out-and-back':
-                return this.generateOutAndBack(baseCoordinates, options);
-            case 'circular':
-                return this.generateCircularLoop(baseCoordinates, options);
-            case 'figure-8':
-                return this.generateFigure8(baseCoordinates, options);
-            case 'multiple-waypoints':
-                return this.generateMultipleWaypoints(baseCoordinates, options);
-            default:
-                return baseCoordinates;
-        }
-    }
-
-    /**
-     * Generate out-and-back route
-     */
-    generateOutAndBack(coordinates, options = {}) {
+    generateLapsRoute(baseCoordinates, options = {}) {
         const { numLoops = 1, gapDistance = 50 } = options;
-        let route = [...coordinates];
-        
-        for (let i = 1; i < numLoops; i++) {
-            // Add gap
-            if (gapDistance > 0) {
+        let route = [];
+        for (let i = 0; i < numLoops; i++) {
+            if (i > 0 && gapDistance > 0) {
+                // Add a gap between laps
                 const lastCoord = route[route.length - 1];
-                const firstCoord = coordinates[0];
+                const firstCoord = (i % 2 === 0) ? baseCoordinates[0] : baseCoordinates[baseCoordinates.length - 1];
                 const gapCoords = this.createGapCoords(lastCoord, firstCoord, gapDistance);
                 route.push(...gapCoords);
             }
-            
-            // Add reverse route
-            route.push(...coordinates.slice().reverse());
-        }
-        
-        return route;
-    }
-
-    /**
-     * Generate circular loop
-     */
-    generateCircularLoop(coordinates, options = {}) {
-        // Create a circular path around the center
-        const center = this.calculateCenter(coordinates);
-        const radius = options.radius || 0.5; // km
-        const points = options.points || 20;
-        
-        const circularCoords = [];
-        for (let i = 0; i < points; i++) {
-            const angle = (i / points) * 2 * Math.PI;
-            const lat = center[0] + (radius / 111) * Math.cos(angle);
-            const lng = center[1] + (radius / (111 * Math.cos(center[0] * Math.PI / 180))) * Math.sin(angle);
-            circularCoords.push([lat, lng]);
-        }
-        
-        return circularCoords;
-    }
-
-    /**
-     * Generate figure-8 route
-     */
-    generateFigure8(coordinates, options = {}) {
-        const center = this.calculateCenter(coordinates);
-        const radius = options.radius || 0.3; // km
-        const points = options.points || 16;
-        
-        const figure8Coords = [];
-        for (let i = 0; i < points; i++) {
-            const angle = (i / points) * 2 * Math.PI;
-            const r = radius * Math.sin(2 * angle);
-            const lat = center[0] + (r / 111) * Math.cos(angle);
-            const lng = center[1] + (r / (111 * Math.cos(center[0] * Math.PI / 180))) * Math.sin(angle);
-            figure8Coords.push([lat, lng]);
-        }
-        
-        return figure8Coords;
-    }
-
-    /**
-     * Generate multiple waypoints route
-     */
-    generateMultipleWaypoints(coordinates, options = {}) {
-        const waypoints = options.waypoints || [];
-        if (waypoints.length === 0) return coordinates;
-        
-        let route = [...coordinates];
-        
-        waypoints.forEach((waypoint, index) => {
-            if (index > 0) {
-                // Add path to waypoint
-                const prevWaypoint = waypoints[index - 1];
-                const pathToWaypoint = this.interpolatePath(prevWaypoint, waypoint);
-                route.push(...pathToWaypoint);
+            // Alternate between route and reversed route
+            if (i % 2 === 0) {
+                route.push(...baseCoordinates);
+            } else {
+                route.push(...baseCoordinates.slice().reverse());
             }
-        });
-        
+        }
         return route;
+    }
+
+    /**
+     * Generate route based on lap type (all types use laps logic)
+     */
+    generateLoopRoute(baseCoordinates, loopType, options = {}) {
+        // All lap types now use repeated laps logic
+        return this.generateLapsRoute(baseCoordinates, options);
     }
 
     /**

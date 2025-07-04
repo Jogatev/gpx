@@ -46,6 +46,52 @@
                 </div>
             </div>
 
+            <!-- Run Details -->
+            <div class="sidebar-section" id="runDetailsSection">
+                <h3><i class="fas fa-running"></i> Run Details</h3>
+                <div class="form-group">
+                    <label for="paceUnit">Pace Unit</label>
+                    <select id="paceUnit" class="form-select">
+                        <option value="min/km">min/km</option>
+                        <option value="min/mi">min/mi</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="avgPace">Average Pace (min/km)</label>
+                    <div style="display: flex; align-items: center; gap: 1em;">
+                        <input type="range" id="avgPace" min="3.0" max="10.0" step="0.01" value="5.50" style="flex:1;">
+                        <span id="avgPaceValue">5.50</span> <span id="paceUnitLabel">min/km</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="paceInconsistency">Pace Inconsistency</label>
+                    <div style="display: flex; align-items: center; gap: 1em;">
+                        <input type="range" id="paceInconsistency" min="0" max="100" step="1" value="0" style="flex:1;">
+                        <span id="paceInconsistencyValue">0%</span>
+                    </div>
+                    <small>Constant pace throughout the run (most efficient)</small>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="includeHR"> Include Heart Rate Data</label>
+                </div>
+                <div class="form-group">
+                    <label for="runName">Run Name</label>
+                    <input type="text" id="runName" class="form-input" value="Morning Run">
+                </div>
+                <div class="form-group">
+                    <label for="runDate">Date</label>
+                    <input type="date" id="runDate" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="runStartTime">Start Time</label>
+                    <input type="time" id="runStartTime" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="runDesc">Description</label>
+                    <textarea id="runDesc" class="form-input" rows="2" placeholder="Great morning run through the park..."></textarea>
+                </div>
+            </div>
+
             <!-- Route Templates -->
             <div class="sidebar-section">
                 <h3><i class="fas fa-map-marked-alt"></i> Route Templates</h3>
@@ -62,20 +108,20 @@
                 </div>
             </div>
 
-            <!-- Loop Configuration -->
+            <!-- Lap Configuration -->
             <div class="sidebar-section">
-                <h3><i class="fas fa-redo"></i> Loop Settings</h3>
+                <h3><i class="fas fa-redo"></i> Lap Settings</h3>
                 <div class="form-group">
-                    <label for="loopType">Loop Type:</label>
+                    <label for="loopType">Lap Type:</label>
                     <select id="loopType" class="form-select">
                         <option value="out-and-back">↔️ Out and Back</option>
-                        <option value="circular">🔄 Circular Loop</option>
+                        <option value="circular">🔄 Circular Lap</option>
                         <option value="figure-8">∞ Figure 8</option>
                         <option value="multiple-waypoints">📍 Multiple Waypoints</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="numLoops">Number of Loops:</label>
+                    <label for="numLoops">Number of Laps:</label>
                     <input type="number" id="numLoops" class="form-input" value="1" min="1" max="10">
                 </div>
                 <div class="form-group">
@@ -83,7 +129,7 @@
                     <input type="number" id="gapDistance" class="form-input" value="50" min="0" max="500">
                 </div>
                 <button id="createLoop" class="btn btn-success">
-                    <i class="fas fa-magic"></i> Create Loop
+                    <i class="fas fa-magic"></i> Create Lap
                 </button>
             </div>
 
@@ -154,6 +200,13 @@
         <main class="map-container">
             <div id="map"></div>
             
+            <!-- Shape/Draw Mode Buttons -->
+            <div class="draw-modes" style="display: flex; gap: 1em; margin: 1em 0 0 1em;">
+                <button id="drawShape" class="draw-mode-btn active">Draw</button>
+                <button id="drawHeart" class="draw-mode-btn">Heart</button>
+                <button id="drawCircle" class="draw-mode-btn">Circle</button>
+            </div>
+            
             <!-- Map Controls Overlay -->
             <div class="map-controls">
                 <div class="control-group">
@@ -177,6 +230,23 @@
         </main>
     </div>
 
+    <!-- Data Visualization -->
+    <section class="data-visualization" style="margin: 2em;">
+        <h2>Data Visualization</h2>
+        <div class="data-graphs">
+            <div class="data-graph" id="paceProfileGraph">
+                <h3>Pace Profile</h3>
+                <canvas id="paceProfileCanvas" width="600" height="200"></canvas>
+                <div id="paceProfileStats">Preview - Draw a route to see real data</div>
+            </div>
+            <div class="data-graph" id="elevationProfileGraph">
+                <h3>Elevation Profile</h3>
+                <canvas id="elevationProfileCanvas" width="600" height="200"></canvas>
+                <div id="elevationProfileStats">Preview - Draw a route to see real data</div>
+            </div>
+        </div>
+    </section>
+
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay hidden">
         <div class="loading-content">
@@ -189,6 +259,9 @@
     <div id="toastContainer" class="toast-container"></div>
 
     <!-- Scripts -->
+    <script>
+      window.MAPBOX_TOKEN = 'pk.eyJ1Ijoiam9nYXRldiIsImEiOiJjbWNsajl1MWgwY2ZsMm1vbTN6enJnZ245In0.Us4E9e5nunbG0G0JbQI1Bw';
+    </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/elevation.js"></script>

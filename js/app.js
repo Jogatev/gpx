@@ -73,8 +73,12 @@ class GPXRouteGenerator {
         // Template Actions
         addEventListener('applyTemplate', 'click', () => this.applySelectedTemplate());
 
-        // Loop Configuration
+        // Lap Configuration
         addEventListener('createLoop', 'click', () => this.createLoop());
+        // Live update stats on lap controls change
+        ['numLoops', 'loopType', 'gapDistance'].forEach(id => {
+            addEventListener(id, 'input', () => this.previewLapStats());
+        });
 
         // Snapping Options
         addEventListener('snapRoute', 'click', () => this.snapRoute());
@@ -151,7 +155,7 @@ class GPXRouteGenerator {
             opacity: 0.8
         }).addTo(this.map);
 
-        this.updateStats();
+        this.previewLapStats();
         this.updateStatus(`Added point ${this.currentRoute.length}`);
     }
 
@@ -165,7 +169,7 @@ class GPXRouteGenerator {
         }
         
         this.drawnItems.clearLayers();
-        this.updateStats();
+        this.previewLapStats();
         this.updateStatus('Route cleared');
         this.showToast('Route cleared', 'success');
     }
@@ -188,7 +192,7 @@ class GPXRouteGenerator {
                 this.currentPolyline = null;
             }
             
-            this.updateStats();
+            this.previewLapStats();
             this.updateStatus(`Removed last point. ${this.currentRoute.length} points remaining`);
         }
     }
@@ -233,7 +237,7 @@ class GPXRouteGenerator {
                 opacity: 0.8
             }).addTo(this.map);
 
-            this.updateStats();
+            this.previewLapStats();
             this.updateStatus(`Applied template: ${template.name}`);
             this.showToast(`Template "${template.name}" applied successfully!`, 'success');
             
@@ -267,14 +271,16 @@ class GPXRouteGenerator {
             const numLoops = parseInt(numLoopsElement.value);
             const gapDistance = parseInt(gapDistanceElement.value);
             
+            // Generate the full looped route
             const loopedRoute = window.RouteTemplates.generateLoopRoute(
                 this.currentRoute, 
                 loopType, 
                 { numLoops, gapDistance }
             );
             
-            // Update the current route
+            // Update the current route to the full looped route
             this.currentRoute = loopedRoute;
+            this.snappedRoute = null; // Clear snappedRoute so stats use the looped route
             
             // Update the polyline
             if (this.currentPolyline) {
@@ -286,8 +292,8 @@ class GPXRouteGenerator {
                 weight: 5,
                 opacity: 0.8
             }).addTo(this.map);
-            
-            this.updateStats();
+
+            this.previewLapStats();
             this.updateStatus(`Created ${loopType} loop with ${numLoops} repetitions`);
             this.showToast('Loop created successfully!', 'success');
             
@@ -311,8 +317,8 @@ class GPXRouteGenerator {
             const snapModeElement = document.getElementById('snapMode');
             if (!snapModeElement) {
                 this.showToast('Snap mode selector not found', 'error');
-            return;
-        }
+                return;
+            }
             
             const snapMode = snapModeElement.value;
             const snappedCoordinates = await window.RouteSnapping.snapRoute(
@@ -321,6 +327,7 @@ class GPXRouteGenerator {
             );
             
             if (snappedCoordinates && snappedCoordinates.length > 0) {
+                // Update snappedRoute to the full snapped route
                 this.snappedRoute = snappedCoordinates;
                 
                 // Clear existing snapped route
@@ -348,7 +355,7 @@ class GPXRouteGenerator {
                     })
                 }).addTo(this.drawnItems);
                 
-                this.updateStats();
+                this.previewLapStats();
                 this.updateStatus('Route snapped to roads successfully');
                 this.showToast('Route snapped to roads!', 'success');
                 
@@ -409,10 +416,13 @@ class GPXRouteGenerator {
         }
     }
 
-    updateStats() {
-        const routeToUse = this.snappedRoute || this.currentRoute;
+    updateStats(routeOverride) {
+        const routeToUse = routeOverride || this.snappedRoute || this.currentRoute;
         
-        if (routeToUse.length < 2) {
+        // Debug: Log the number of points in the route used for stats
+        console.log('[updateStats] Route length for stats:', routeToUse ? routeToUse.length : 0);
+        
+        if (!routeToUse || routeToUse.length < 2) {
             const distanceElement = document.getElementById('distance');
             const durationElement = document.getElementById('duration');
             const elevationElement = document.getElementById('elevation');
@@ -586,6 +596,33 @@ class GPXRouteGenerator {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    // Preview lap stats when lap controls change
+    previewLapStats() {
+        // Only preview if there is a route drawn
+        if (!this.currentRoute || this.currentRoute.length < 2) {
+            this.updateStats();
+            return;
+        }
+        const loopTypeElement = document.getElementById('loopType');
+        const numLoopsElement = document.getElementById('numLoops');
+        const gapDistanceElement = document.getElementById('gapDistance');
+        if (!loopTypeElement || !numLoopsElement || !gapDistanceElement) {
+            this.updateStats();
+            return;
+        }
+        const loopType = loopTypeElement.value;
+        const numLoops = parseInt(numLoopsElement.value);
+        const gapDistance = parseInt(gapDistanceElement.value);
+        // Generate the preview lap route
+        const previewRoute = window.RouteTemplates.generateLoopRoute(
+            this.currentRoute,
+            loopType,
+            { numLoops, gapDistance }
+        );
+        // Update stats using the preview route
+        this.updateStats(previewRoute);
     }
 }
 

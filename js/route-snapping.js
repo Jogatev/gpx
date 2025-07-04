@@ -73,7 +73,7 @@ class RouteSnappingService {
                     snappedCoords = this.optimizeForWalking(coordinates);
                 } else {
                     snappedCoords = await this.simulateRoadSnapping(coordinates, { ...options, profile });
-            }
+                }
             }
             // Simplify route if requested
             if (simplify && snappedCoords.length > maxPoints) {
@@ -453,4 +453,14 @@ class RouteSnappingService {
 }
 
 // Create global instance
-window.RouteSnappingService = new RouteSnappingService(); 
+window.RouteSnappingService = new RouteSnappingService();
+
+// Expose RouteSnapping as a global object for the app
+window.RouteSnapping = {
+  snapRoute: async function(coords, mode) {
+    if (!window._routeSnappingService) {
+      window._routeSnappingService = new RouteSnappingService();
+    }
+    return window._routeSnappingService.snapToRoads(coords, { profile: mode });
+  }
+}; 
