@@ -487,40 +487,52 @@ document.addEventListener('DOMContentLoaded', function () {
         const numLoops = shouldLoop ? parseInt(loopCount.value) || 1 : 1;
         
         if (shouldLoop && numLoops > 1) {
-            // Create looped coordinates
+            // Create backtracking coordinates
             const originalCoords = [...currentRoute.coordinates];
-            const loopedCoords = [];
+            const backtrackedCoords = [];
             
             for (let i = 0; i < numLoops; i++) {
                 if (i > 0) {
                     // Add a small gap between loops (optional)
-                    const lastCoord = loopedCoords[loopedCoords.length - 1];
+                    const lastCoord = backtrackedCoords[backtrackedCoords.length - 1];
                     const firstCoord = originalCoords[0];
                     const gapCoords = createGapCoords(lastCoord, firstCoord, 50); // 50m gap
-                    loopedCoords.push(...gapCoords);
+                    backtrackedCoords.push(...gapCoords);
                 }
-                loopedCoords.push(...originalCoords);
+                
+                if (i % 2 === 0) {
+                    // Forward direction
+                    backtrackedCoords.push(...originalCoords);
+                } else {
+                    // Backward direction (reverse the coordinates)
+                    backtrackedCoords.push(...originalCoords.slice().reverse());
+                }
             }
             
-            // Update current route with looped coordinates
+            // Update current route with backtracked coordinates
             const pace = parseFloat(document.getElementById('avgPace')?.value) || 5.5;
             const startTime = document.getElementById('runStartTime')?.value || new Date().toISOString();
-            const timestamps = generateTimestamps(loopedCoords, pace, startTime);
+            const timestamps = generateTimestamps(backtrackedCoords, pace, startTime);
             
-            // Get elevation data for looped route
+            // Get elevation data for backtracked route
             let elevations = [];
             if (window.ElevationService) {
-                // For now, we'll duplicate elevation data for loops
-                // In a more sophisticated implementation, you might want to fetch elevation for the full route
+                // Duplicate elevation data for loops, reversing for backtracking
                 elevations = [...currentRoute.elevations];
                 for (let i = 1; i < numLoops; i++) {
-                    elevations.push(...currentRoute.elevations);
+                    if (i % 2 === 0) {
+                        // Forward direction - add elevation data as is
+                        elevations.push(...currentRoute.elevations);
+                    } else {
+                        // Backward direction - reverse elevation data
+                        elevations.push(...currentRoute.elevations.slice().reverse());
+                    }
                 }
             }
             
             // Update the route layer
             drawnItems.clearLayers();
-            const poly = L.polyline(loopedCoords, { 
+            const poly = L.polyline(backtrackedCoords, { 
                 color: isSnapped ? '#3498db' : '#e67e22', 
                 weight: 5 
             });
@@ -528,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // Update current route state
             currentRoute = {
-                coordinates: loopedCoords,
+                coordinates: backtrackedCoords,
                 elevations: elevations,
                 timestamps: timestamps,
                 layer: poly
