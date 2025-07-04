@@ -30,10 +30,10 @@ class GPXRouteGenerator {
                 const pos = await new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
                 });
-                center = [pos.coords.latitude, pos.coords.longitude];
+                center = this.adjustUserLocation([pos.coords.latitude, pos.coords.longitude]);
                 zoom = 15;
             } catch (e) {
-               
+                console.warn('Geolocation failed:', e);
             }
         }
         this.map = L.map('map', {
@@ -90,6 +90,8 @@ class GPXRouteGenerator {
         addEventListener('drawMode', 'click', () => this.setMode('draw'));
         addEventListener('panMode', 'click', () => this.setMode('pan'));
         addEventListener('measureMode', 'click', () => this.setMode('measure'));
+        addEventListener('centerToUser', 'click', () => this.centerToUserLocation());
+        addEventListener('saveGPSSettings', 'click', () => this.saveGPSSettings());
 
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
     }
@@ -108,6 +110,9 @@ class GPXRouteGenerator {
         }
         
         this.autoSnap = autoSnapElement ? autoSnapElement.checked : true;
+        
+        // Load saved GPS settings
+        this.loadGPSSettings();
         
         this.updateStatus('Ready to draw your route');
     }
@@ -192,6 +197,75 @@ class GPXRouteGenerator {
             const bounds = L.latLngBounds(this.currentRoute);
             this.map.fitBounds(bounds, { padding: [20, 20] });
             this.updateStatus('Map fitted to route');
+        }
+    }
+
+    adjustUserLocation(coordinates) {
+        const latOffsetInput = document.getElementById('latOffset');
+        const lngOffsetInput = document.getElementById('lngOffset');
+        
+        const latOffset = latOffsetInput ? parseFloat(latOffsetInput.value) || 0 : 0;
+        const lngOffset = lngOffsetInput ? parseFloat(lngOffsetInput.value) || 0 : 0;
+        
+        return [
+            coordinates[0] + latOffset,
+            coordinates[1] + lngOffset
+        ];
+    }
+
+    saveGPSSettings() {
+        const latOffsetInput = document.getElementById('latOffset');
+        const lngOffsetInput = document.getElementById('lngOffset');
+        
+        if (latOffsetInput && lngOffsetInput) {
+            const latOffset = parseFloat(latOffsetInput.value) || 0;
+            const lngOffset = parseFloat(lngOffsetInput.value) || 0;
+            
+            localStorage.setItem('gpsLatOffset', latOffset.toString());
+            localStorage.setItem('gpsLngOffset', lngOffset.toString());
+            
+            this.showToast('GPS settings saved', 'success');
+        }
+    }
+
+    loadGPSSettings() {
+        const latOffsetInput = document.getElementById('latOffset');
+        const lngOffsetInput = document.getElementById('lngOffset');
+        
+        if (latOffsetInput && lngOffsetInput) {
+            const savedLatOffset = localStorage.getItem('gpsLatOffset');
+            const savedLngOffset = localStorage.getItem('gpsLngOffset');
+            
+            if (savedLatOffset) latOffsetInput.value = savedLatOffset;
+            if (savedLngOffset) lngOffsetInput.value = savedLngOffset;
+        }
+    }
+
+    async centerToUserLocation() {
+        if (!navigator.geolocation) {
+            this.showToast('Geolocation not supported', 'error');
+            return;
+        }
+
+        try {
+            this.showLoading('Getting your location...');
+            const pos = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { 
+                    enableHighAccuracy: true, 
+                    timeout: 10000,
+                    maximumAge: 30000
+                });
+            });
+            
+            const adjustedLocation = this.adjustUserLocation([pos.coords.latitude, pos.coords.longitude]);
+            this.map.setView(adjustedLocation, 15);
+            this.hideLoading();
+            this.updateStatus('Centered to your location');
+            this.showToast('Map centered to your location', 'success');
+        } catch (error) {
+            this.hideLoading();
+            console.error('Error getting location:', error);
+            this.showToast('Failed to get your location', 'error');
         }
     }
 
@@ -355,7 +429,6 @@ class GPXRouteGenerator {
     setMode(mode) {
         this.mode = mode;
         
-        // Update UI
         document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
         const modeButton = document.getElementById(`${mode}Mode`);
         if (modeButton) {
@@ -399,7 +472,6 @@ class GPXRouteGenerator {
     updateStats(routeOverride) {
         const routeToUse = routeOverride || this.snappedRoute || this.currentRoute;
         
-        // Debug: Log the number of points in the route used for stats
         console.log('[updateStats] Route length for stats:', routeToUse ? routeToUse.length : 0);
         
         if (!routeToUse || routeToUse.length < 2) {
@@ -415,7 +487,6 @@ class GPXRouteGenerator {
             return;
         }
         
-        // Calculate distance
         let totalDistance = 0;
         for (let i = 1; i < routeToUse.length; i++) {
             const prev = routeToUse[i - 1];
@@ -423,16 +494,13 @@ class GPXRouteGenerator {
             totalDistance += this.calculateDistance(prev, curr);
         }
         
-        // Calculate duration (assuming 5:30 min/km pace)
         const paceMinutes = 5.5;
         const durationMinutes = totalDistance * paceMinutes;
         const hours = Math.floor(durationMinutes / 60);
         const minutes = Math.floor(durationMinutes % 60);
         
-        // Calculate elevation (placeholder)
-        const elevation = Math.floor(totalDistance * 50); // Rough estimate
+        const elevation = Math.floor(totalDistance * 50);
         
-        // Update UI
         const distanceElement = document.getElementById('distance');
         const durationElement = document.getElementById('duration');
         const elevationElement = document.getElementById('elevation');
@@ -445,7 +513,7 @@ class GPXRouteGenerator {
     }
 
     calculateDistance(point1, point2) {
-        const R = 6371; // Earth's radius in km
+        const R = 6371;
         const dLat = (point2[0] - point1[0]) * Math.PI / 180;
         const dLon = (point2[1] - point1[1]) * Math.PI / 180;
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -494,7 +562,6 @@ class GPXRouteGenerator {
         
         toastContainer.appendChild(toast);
         
-        // Auto-remove after 3 seconds
         setTimeout(() => {
             if (toast.parentNode) {
                 toast.parentNode.removeChild(toast);
@@ -578,9 +645,7 @@ class GPXRouteGenerator {
         URL.revokeObjectURL(url);
     }
 
-    // Preview lap stats when lap controls change
     previewLapStats() {
-        // Only preview if there is a route drawn
         if (!this.currentRoute || this.currentRoute.length < 2) {
             this.updateStats();
             return;
@@ -595,25 +660,26 @@ class GPXRouteGenerator {
         const loopType = loopTypeElement.value;
         const numLoops = parseInt(numLoopsElement.value);
         const gapDistance = parseInt(gapDistanceElement.value);
-        // Generate the preview lap route
         const previewRoute = window.RouteTemplates.generateLoopRoute(
             this.currentRoute,
             loopType,
             { numLoops, gapDistance }
         );
-        // Update stats using the preview route
         this.updateStats(previewRoute);
     }
 }
 
-// Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.routeGenerator = new GPXRouteGenerator();
 
-    // Sidebar toggle logic
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('toggleSidebar');
     const toggleIcon = toggleBtn ? toggleBtn.querySelector('i') : null;
+    if (toggleBtn) {
+        // Set initial left position
+        toggleBtn.style.left = sidebar && sidebar.classList.contains('sidebar-collapsed') ? '48px' : '350px';
+        toggleBtn.style.transition = 'left 0.3s cubic-bezier(0.4,0,0.2,1), transform 0.3s';
+    }
     if (sidebar && toggleBtn) {
         toggleBtn.addEventListener('click', () => {
             const collapsed = sidebar.classList.toggle('sidebar-collapsed');
@@ -621,11 +687,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.routeGenerator.map.invalidateSize();
             }
             if (toggleIcon) {
-                toggleIcon.className = collapsed ? 'fas fa-angle-right' : 'fas fa-angle-left';
+                toggleIcon.className = collapsed ? 'fas fa-bars' : 'fas fa-times';
             }
-            
             toggleBtn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-            
+            // Move the button
+            toggleBtn.style.left = collapsed ? '48px' : '350px';
             toggleBtn.focus();
         });
     }
