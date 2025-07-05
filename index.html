@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#3498db">
     <title>GPX Route Generator - Advanced Running Route Creator</title>
     
     
@@ -233,16 +237,16 @@
                 
                 <div class="map-controls">
                 <div class="control-group">
-                    <button id="drawMode" class="control-btn active" title="Draw Mode">
+                    <button id="drawMode" class="control-btn active" title="Draw Mode" aria-label="Switch to draw mode">
                         <i class="fas fa-pencil-alt"></i>
                     </button>
-                    <button id="panMode" class="control-btn" title="Pan Mode">
+                    <button id="panMode" class="control-btn" title="Pan Mode" aria-label="Switch to pan mode">
                         <i class="fas fa-hand-paper"></i>
                     </button>
-                    <button id="measureMode" class="control-btn" title="Measure Distance">
+                    <button id="measureMode" class="control-btn" title="Measure Distance" aria-label="Switch to measure mode">
                         <i class="fas fa-ruler"></i>
                     </button>
-                    <button id="centerToUser" class="control-btn" title="Center to My Location">
+                    <button id="centerToUser" class="control-btn" title="Center to My Location" aria-label="Center map to my location">
                         <i class="fas fa-crosshairs"></i>
                     </button>
                 </div>
@@ -252,6 +256,16 @@
             <div class="status-bar">
                 <span id="statusMessage">Ready to draw your route</span>
                 <span id="coordinates" class="coordinates-display"></span>
+                <div class="mobile-status" id="mobileStatus">
+                    <span class="location-indicator" id="locationIndicator">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="locationAccuracy">--</span>
+                    </span>
+                    <span class="touch-hint" id="touchHint">
+                        <i class="fas fa-hand-pointer"></i>
+                        Tap to add points
+                    </span>
+                </div>
             </div>
         </main>
     </div>

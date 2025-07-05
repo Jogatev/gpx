@@ -15,6 +15,8 @@ class GPXRouteGenerator {
             await this.initializeMap();
             this.setupEventListeners();
             this.setupUI();
+            this.setupTouchFeedback();
+            this.updateMobileStatus(null, 'draw');
             this.showToast('Application loaded successfully!', 'success');
         } catch (error) {
             console.error('Failed to initialize application:', error);
@@ -25,35 +27,224 @@ class GPXRouteGenerator {
     async initializeMap() {
         let center = [14.5547, 121.0244]; 
         let zoom = 13;
+        
         if (navigator.geolocation) {
             try {
-                const pos = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
-                });
+                this.showLoading('Getting your location...');
+                
+                const pos = await this.getUserLocationWithFallback();
                 center = this.adjustUserLocation([pos.coords.latitude, pos.coords.longitude]);
                 zoom = 15;
+                
+                this.hideLoading();
+                this.updateMobileStatus(pos.coords.accuracy);
+                this.showToast('Location detected successfully!', 'success');
             } catch (e) {
                 console.warn('Geolocation failed:', e);
+                this.hideLoading();
+                this.showToast('Using default location. Enable location access for better experience.', 'warning');
             }
         }
+        
         this.map = L.map('map', {
             center,
             zoom,
             zoomControl: true,
-            attributionControl: true
+            attributionControl: true,
+            tap: true,
+            tapTolerance: 15,
+            preferCanvas: true,
+            bounceAtZoomLimits: false,
+            zoomAnimation: true,
+            fadeAnimation: true,
+            markerZoomAnimation: true
         });
+        
         if (!window.MAPBOX_TOKEN) {
             console.error('Mapbox token is not set. Please set window.MAPBOX_TOKEN before loading the map.');
         }
+        
         L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token={accessToken}', {
             accessToken: window.MAPBOX_TOKEN,
             maxZoom: 18,
             attribution: '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a>'
         }).addTo(this.map);
+        
         this.drawnItems = new L.FeatureGroup();
         this.map.addLayer(this.drawnItems);
+        
         this.map.on('click', (e) => this.handleMapClick(e));
         this.map.on('mousemove', (e) => this.handleMouseMove(e));
+        
+        this.setupTouchGestures();
+        
+        this.setupMobileControls();
+    }
+
+    async getUserLocationWithFallback() {
+        const options = [
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
+        ];
+
+        for (let i = 0; i < options.length; i++) {
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, options[i]);
+                });
+                
+                if (pos.coords.accuracy <= 100) {
+                    return pos;
+                } else if (i === options.length - 1) {
+                    return pos;
+                }
+            } catch (error) {
+                if (i === options.length - 1) {
+                    throw error;
+                }
+            }
+        }
+    }
+
+    setupTouchGestures() {
+        let touchStartTime = 0;
+        let touchStartPos = null;
+        let isDrawing = false;
+        let lastTouchTime = 0;
+        const doubleTapDelay = 300;
+
+        this.map.on('touchstart', (e) => {
+            if (this.mode !== 'draw') return;
+            
+            touchStartTime = Date.now();
+            touchStartPos = e.touches[0];
+            isDrawing = false;
+        });
+
+        this.map.on('touchmove', (e) => {
+            if (this.mode !== 'draw') return;
+            
+            const currentTime = Date.now();
+            const touch = e.touches[0];
+            
+            if (touchStartPos && this.calculateTouchDistance(touchStartPos, touch) > 10) {
+                isDrawing = true;
+            }
+            
+            if (isDrawing) {
+                e.originalEvent.preventDefault();
+            }
+        });
+
+        this.map.on('touchend', (e) => {
+            if (this.mode !== 'draw') return;
+            
+            const currentTime = Date.now();
+            const touchDuration = currentTime - touchStartTime;
+            
+            if (!isDrawing && touchDuration < 500) {
+                const touch = e.changedTouches[0];
+                const latlng = this.map.containerPointToLatLng([touch.clientX, touch.clientY]);
+                this.addPoint(latlng);
+                
+                if (this.autoSnap && this.currentRoute.length > 1) {
+                    this.snapRoute();
+                }
+            }
+            
+            if (currentTime - lastTouchTime < doubleTapDelay) {
+                this.fitToRoute();
+                e.originalEvent.preventDefault();
+            }
+            
+            lastTouchTime = currentTime;
+            touchStartPos = null;
+            isDrawing = false;
+        });
+
+        this.map.on('zoomstart', () => {
+            if (this.isDrawing) {
+                this.pauseDrawing();
+            }
+        });
+
+        this.map.on('zoomend', () => {
+            if (this.isDrawing) {
+                this.resumeDrawing();
+            }
+        });
+    }
+
+    calculateTouchDistance(touch1, touch2) {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    setupMobileControls() {
+        const fab = document.createElement('div');
+        fab.className = 'mobile-fab';
+        fab.innerHTML = `
+            <button class="fab-button fab-draw" title="Draw Mode" aria-label="Switch to draw mode">
+                <i class="fas fa-pencil-alt"></i>
+            </button>
+            <button class="fab-button fab-location" title="My Location" aria-label="Center to my location">
+                <i class="fas fa-crosshairs"></i>
+            </button>
+            <button class="fab-button fab-fit" title="Fit Route" aria-label="Fit map to route">
+                <i class="fas fa-expand"></i>
+            </button>
+        `;
+        
+        document.body.appendChild(fab);
+        
+        fab.querySelector('.fab-draw').addEventListener('click', () => {
+            this.setMode('draw');
+            this.showToast('Draw mode activated', 'info');
+        });
+        
+        fab.querySelector('.fab-location').addEventListener('click', () => {
+            this.centerToUserLocation();
+        });
+        
+        fab.querySelector('.fab-fit').addEventListener('click', () => {
+            this.fitToRoute();
+        });
+        
+        let startX = 0;
+        let startY = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            const deltaX = endX - startX;
+            const deltaY = endY - startY;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+                const sidebar = document.getElementById('sidebar');
+                const toggleBtn = document.getElementById('toggleSidebar');
+                
+                if (deltaX > 0 && sidebar && sidebar.classList.contains('sidebar-collapsed')) {
+                    toggleBtn.click();
+                } else if (deltaX < 0 && sidebar && !sidebar.classList.contains('sidebar-collapsed')) {
+                    toggleBtn.click();
+                }
+            }
+        });
+    }
+
+    pauseDrawing() {
+        this.isDrawing = true;
+    }
+
+    resumeDrawing() {
+        this.isDrawing = false;
     }
 
     setupEventListeners() {
@@ -111,7 +302,6 @@ class GPXRouteGenerator {
         
         this.autoSnap = autoSnapElement ? autoSnapElement.checked : true;
         
-        // Load saved GPS settings
         this.loadGPSSettings();
         
         this.updateStatus('Ready to draw your route');
@@ -137,6 +327,33 @@ class GPXRouteGenerator {
         }
     }
 
+    updateMobileStatus(accuracy = null, mode = 'draw') {
+        const locationAccuracyElement = document.getElementById('locationAccuracy');
+        const touchHintElement = document.getElementById('touchHint');
+        
+        if (locationAccuracyElement && accuracy !== null) {
+            if (accuracy <= 10) {
+                locationAccuracyElement.textContent = 'High';
+                locationAccuracyElement.style.color = '#27ae60';
+            } else if (accuracy <= 50) {
+                locationAccuracyElement.textContent = 'Good';
+                locationAccuracyElement.style.color = '#f39c12';
+            } else {
+                locationAccuracyElement.textContent = `${Math.round(accuracy)}m`;
+                locationAccuracyElement.style.color = '#e74c3c';
+            }
+        }
+        
+        if (touchHintElement) {
+            const hints = {
+                'draw': 'Tap to add points',
+                'pan': 'Drag to move map',
+                'measure': 'Tap to measure'
+            };
+            touchHintElement.innerHTML = `<i class="fas fa-hand-pointer"></i> ${hints[mode] || 'Tap to add points'}`;
+        }
+    }
+
     addPoint(latlng) {
         this.currentRoute.push([latlng.lat, latlng.lng]);
         
@@ -150,6 +367,10 @@ class GPXRouteGenerator {
             opacity: 0.8
         }).addTo(this.map);
 
+        if ('vibrate' in navigator) {
+            navigator.vibrate(50);
+        }
+        
         this.previewLapStats();
         this.updateStatus(`Added point ${this.currentRoute.length}`);
     }
@@ -249,23 +470,39 @@ class GPXRouteGenerator {
 
         try {
             this.showLoading('Getting your location...');
-            const pos = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, { 
-                    enableHighAccuracy: true, 
-                    timeout: 10000,
-                    maximumAge: 30000
-                });
-            });
+            
+            const pos = await this.getUserLocationWithFallback();
             
             const adjustedLocation = this.adjustUserLocation([pos.coords.latitude, pos.coords.longitude]);
             this.map.setView(adjustedLocation, 15);
+            
             this.hideLoading();
             this.updateStatus('Centered to your location');
-            this.showToast('Map centered to your location', 'success');
+            this.updateMobileStatus(pos.coords.accuracy);
+            
+            const accuracy = pos.coords.accuracy;
+            if (accuracy <= 10) {
+                this.showToast('High accuracy location detected!', 'success');
+            } else if (accuracy <= 50) {
+                this.showToast('Good accuracy location detected', 'success');
+            } else {
+                this.showToast(`Location detected (accuracy: ±${Math.round(accuracy)}m)`, 'warning');
+            }
+            
         } catch (error) {
             this.hideLoading();
             console.error('Error getting location:', error);
-            this.showToast('Failed to get your location', 'error');
+            
+            let errorMessage = 'Failed to get your location';
+            if (error.code === 1) {
+                errorMessage = 'Location access denied. Please enable location permissions.';
+            } else if (error.code === 2) {
+                errorMessage = 'Location unavailable. Please try again.';
+            } else if (error.code === 3) {
+                errorMessage = 'Location request timed out. Please try again.';
+            }
+            
+            this.showToast(errorMessage, 'error');
         }
     }
 
@@ -445,6 +682,8 @@ class GPXRouteGenerator {
             this.map.dragging.enable();
             this.map.doubleClickZoom.enable();
         }
+        
+        this.updateMobileStatus(null, mode);
         
         this.updateStatus(`Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`);
     }
@@ -666,6 +905,38 @@ class GPXRouteGenerator {
             { numLoops, gapDistance }
         );
         this.updateStats(previewRoute);
+    }
+
+    // Add haptic feedback for mobile devices
+    triggerHapticFeedback() {
+        if ('vibrate' in navigator) {
+            navigator.vibrate(50); // Short vibration for feedback
+        }
+    }
+
+    // Enhanced touch feedback
+    addTouchFeedback(element) {
+        if (!element) return;
+        
+        element.addEventListener('touchstart', () => {
+            element.style.transform = 'scale(0.95)';
+            element.style.transition = 'transform 0.1s ease';
+        });
+        
+        element.addEventListener('touchend', () => {
+            element.style.transform = 'scale(1)';
+            setTimeout(() => {
+                element.style.transition = '';
+            }, 100);
+        });
+    }
+
+    // Setup enhanced touch feedback for all buttons
+    setupTouchFeedback() {
+        const buttons = document.querySelectorAll('.btn, .control-btn, .fab-button');
+        buttons.forEach(button => {
+            this.addTouchFeedback(button);
+        });
     }
 }
 

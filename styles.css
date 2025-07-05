@@ -360,20 +360,84 @@ body {
     right: 0;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-    padding: 0.75rem 1.5rem;
+    padding: 0.75rem 1rem;
     border-top: 1px solid rgba(255, 255, 255, 0.2);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.9rem;
-    color: #34495e;
+    font-size: 0.85rem;
+    color: #2c3e50;
     z-index: 1000;
 }
 
 .coordinates-display {
     font-family: 'Courier New', monospace;
     color: #7f8c8d;
+}
+
+/* Mobile status indicators */
+.mobile-status {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.location-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: 0.8rem;
+    color: #27ae60;
+}
+
+.location-indicator i {
+    font-size: 0.9rem;
+}
+
+.touch-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: #3498db;
+}
+
+.touch-hint i {
+    font-size: 0.9rem;
+}
+
+/* Mobile responsive status bar */
+@media (max-width: 768px) {
+    .status-bar {
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .mobile-status {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .coordinates-display {
+        font-size: 0.75rem;
+    }
+
+    .location-indicator,
+    .touch-hint {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .status-bar {
+        padding: 0.375rem;
+    }
+
+    .mobile-status {
+        gap: 0.5rem;
+    }
 }
 
 
@@ -486,16 +550,21 @@ body {
         height: auto;
         max-height: 50vh;
         overflow-y: auto;
+        order: 2;
+        border-right: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
     }
     
     .map-container {
         height: 50vh;
+        order: 1;
     }
     
     .header-content {
         flex-direction: column;
         gap: 0.5rem;
         text-align: center;
+        padding: 0.5rem 1rem;
     }
     
     .header h1 {
@@ -514,8 +583,271 @@ body {
         width: 44px;
         height: 44px;
     }
+
+    /* Enhanced touch targets for mobile */
+    .btn {
+        min-height: 44px;
+        padding: 0.875rem 1.5rem;
+        font-size: 1rem;
+        touch-action: manipulation;
+    }
+
+    .form-select, .form-input {
+        min-height: 44px;
+        font-size: 1rem;
+        touch-action: manipulation;
+    }
+
+    /* Mobile floating action button */
+    .mobile-fab {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 2000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .fab-button {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        font-size: 1.2rem;
+        cursor: pointer;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: manipulation;
+    }
+
+    .fab-button:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .fab-button:active {
+        transform: scale(0.95);
+    }
+
+    .fab-draw {
+        background: linear-gradient(135deg, #27ae60, #229954);
+    }
+
+    .fab-location {
+        background: linear-gradient(135deg, #e67e22, #d35400);
+    }
+
+    .fab-fit {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    }
+
+    /* Hide FAB on desktop */
+    @media (min-width: 769px) {
+        .mobile-fab {
+            display: none;
+        }
+    }
+
+    /* Enhanced sidebar sections for mobile */
+    .sidebar-section {
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+    }
+
+    .sidebar-section h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    /* Better form layout on mobile */
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Improved button groups */
+    .button-group {
+        gap: 0.5rem;
+    }
+
+    .button-group .btn {
+        width: 100%;
+        justify-content: center;
+        min-height: 48px;
+    }
+
+    /* Better template selector */
+    .template-selector {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .template-selector .btn {
+        width: 100%;
+        min-height: 48px;
+    }
+
+    /* Enhanced stats display */
+    .stats-grid {
+        gap: 0.75rem;
+    }
+
+    .stat-item {
+        padding: 0.75rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Better checkbox styling for touch */
+    .checkbox-label {
+        min-height: 44px;
+        padding: 0.5rem 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .checkmark {
+        width: 24px;
+        height: 24px;
+        margin-right: 0.75rem;
+    }
 }
 
+/* Extra small devices */
+@media (max-width: 480px) {
+    .header {
+        padding: 0.75rem 1rem;
+    }
+
+    .header h1 {
+        font-size: 1.3rem;
+    }
+
+    .subtitle {
+        font-size: 0.8rem;
+    }
+
+    .sidebar {
+        padding: 1rem;
+        max-height: 45vh;
+    }
+
+    .map-container {
+        height: 55vh;
+    }
+
+    .mobile-fab {
+        bottom: 16px;
+        right: 16px;
+        gap: 8px;
+    }
+
+    .fab-button {
+        width: 48px;
+        height: 48px;
+        font-size: 1rem;
+    }
+
+    /* Compact form elements */
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .btn {
+        padding: 0.75rem 1.25rem;
+        font-size: 0.9rem;
+    }
+
+    /* Smaller sidebar sections */
+    .sidebar-section {
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+    }
+}
+
+/* Landscape orientation on mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .main-container {
+        flex-direction: row;
+    }
+
+    .sidebar {
+        width: 40%;
+        max-height: 100vh;
+        order: 1;
+        border-right: 1px solid rgba(255, 255, 255, 0.2);
+        border-top: none;
+    }
+
+    .map-container {
+        width: 60%;
+        height: 100vh;
+        order: 2;
+    }
+
+    .mobile-fab {
+        bottom: 12px;
+        right: 12px;
+    }
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    .btn {
+        min-height: 48px;
+        padding: 0.875rem 1.5rem;
+    }
+
+    .form-select, .form-input {
+        min-height: 48px;
+        padding: 0.875rem;
+    }
+
+    /* Better hover states for touch */
+    .btn:hover {
+        transform: none;
+    }
+
+    .btn:active {
+        transform: scale(0.98);
+    }
+
+    /* Improved focus states */
+    .btn:focus,
+    .form-select:focus,
+    .form-input:focus {
+        outline: 3px solid #3498db;
+        outline-offset: 2px;
+    }
+
+    /* Better scrollbar for touch */
+    .sidebar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+        background: rgba(52, 152, 219, 0.5);
+        border-radius: 4px;
+    }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .fab-button {
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+}
 
 .sidebar::-webkit-scrollbar {
     width: 6px;
