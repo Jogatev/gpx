@@ -657,4 +657,65 @@ body {
 
 .sidebar {
     transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+.search-bar-container {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1200;
+    width: 90%;
+    max-width: 400px;
+}
+.search-bar {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 8px 8px 0 0;
+    border: 2px solid #3498db;
+    font-size: 1rem;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.search-suggestions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    border: 2px solid #3498db;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    position: relative;
+}
+.search-suggestions li {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.search-suggestions li:hover, .search-suggestions li.active {
+    background: #eaf6ff;
+}
+
+.search-clear-btn {
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    color: #888;
+    cursor: pointer;
+    z-index: 1300;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 50%;
+    transition: background 0.2s, color 0.2s;
+}
+.search-clear-btn:hover {
+    background: #eaf6ff;
+    color: #3498db;
 } 

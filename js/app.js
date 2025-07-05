@@ -676,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleBtn = document.getElementById('toggleSidebar');
     const toggleIcon = toggleBtn ? toggleBtn.querySelector('i') : null;
     if (toggleBtn) {
-        // Set initial left position
+       
         toggleBtn.style.left = sidebar && sidebar.classList.contains('sidebar-collapsed') ? '48px' : '350px';
         toggleBtn.style.transition = 'left 0.3s cubic-bezier(0.4,0,0.2,1), transform 0.3s';
     }
@@ -690,9 +690,152 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleIcon.className = collapsed ? 'fas fa-bars' : 'fas fa-times';
             }
             toggleBtn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-            // Move the button
+         
             toggleBtn.style.left = collapsed ? '48px' : '350px';
             toggleBtn.focus();
         });
     }
+
+    const searchInput = document.getElementById('locationSearch');
+    const suggestionsList = document.getElementById('searchSuggestions');
+    let debounceTimeout = null;
+    let activeIndex = -1;
+    let currentSuggestions = [];
+    let searchMarker = null;
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'search-clear-btn';
+    clearBtn.innerHTML = '&times;';
+    clearBtn.title = 'Clear search';
+    clearBtn.style.display = 'none';
+    searchInput.parentNode.appendChild(clearBtn);
+
+    function clearSuggestions() {
+        suggestionsList.innerHTML = '';
+        activeIndex = -1;
+        currentSuggestions = [];
+    }
+
+    function showSuggestions(features) {
+        clearSuggestions();
+        features.forEach((feature, idx) => {
+            const li = document.createElement('li');
+            li.textContent = feature.place_name;
+            li.addEventListener('click', () => {
+                flyToFeature(feature);
+                clearSuggestions();
+                searchInput.value = feature.place_name;
+                clearBtn.style.display = 'block';
+            });
+            suggestionsList.appendChild(li);
+        });
+        currentSuggestions = features;
+    }
+
+    function flyToFeature(feature) {
+        if (window.routeGenerator && window.routeGenerator.map && feature.center) {
+            const map = window.routeGenerator.map;
+            const targetLatLng = L.latLng(feature.center[1], feature.center[0]);
+            map.setView(targetLatLng, 15, { animate: false });
+ 
+            if (searchMarker) {
+                map.removeLayer(searchMarker);
+            }
+            searchMarker = L.marker(targetLatLng, {
+                icon: L.icon({
+                    iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    shadowSize: [41, 41]
+                })
+            }).addTo(map);
+            searchMarker.bindPopup(feature.place_name).openPopup();
+        }
+    }
+
+    searchInput && searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+        clearBtn.style.display = query ? 'block' : 'none';
+        if (!query) {
+            clearSuggestions();
+            if (searchMarker && window.routeGenerator && window.routeGenerator.map) {
+                window.routeGenerator.map.removeLayer(searchMarker);
+                searchMarker = null;
+            }
+            return;
+        }
+        if (debounceTimeout) clearTimeout(debounceTimeout);
+        debounceTimeout = setTimeout(() => {
+            let proximity = '';
+            if (window.routeGenerator && window.routeGenerator.map) {
+                const center = window.routeGenerator.map.getCenter();
+                proximity = `&proximity=${center.lng},${center.lat}`;
+            }
+            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${window.MAPBOX_TOKEN}&autocomplete=true&limit=5${proximity}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.features) {
+                        showSuggestions(data.features);
+                    } else {
+                        clearSuggestions();
+                    }
+                })
+                .catch(() => clearSuggestions());
+        }, 300);
+    });
+    searchInput && searchInput.addEventListener('keydown', (e) => {
+        const items = suggestionsList.querySelectorAll('li');
+        if (!items.length) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIndex = (activeIndex + 1) % items.length;
+            updateActive();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIndex = (activeIndex - 1 + items.length) % items.length;
+            updateActive();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeIndex >= 0) {
+                items[activeIndex].click();
+            } else if (currentSuggestions.length > 0) {
+                flyToFeature(currentSuggestions[0]);
+                searchInput.value = currentSuggestions[0].place_name;
+                clearSuggestions();
+                clearBtn.style.display = 'block';
+            }
+        }
+    });
+
+    function updateActive() {
+        const items = suggestionsList.querySelectorAll('li');
+        items.forEach((li, idx) => {
+            if (idx === activeIndex) {
+                li.classList.add('active');
+                li.scrollIntoView({ block: 'nearest' });
+            } else {
+                li.classList.remove('active');
+            }
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !suggestionsList.contains(e.target) && e.target !== clearBtn) {
+            clearSuggestions();
+        }
+    });
+
+    clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearBtn.style.display = 'none';
+        clearSuggestions();
+        if (searchMarker && window.routeGenerator && window.routeGenerator.map) {
+            window.routeGenerator.map.removeLayer(searchMarker);
+            searchMarker = null;
+        }
+        searchInput.focus();
+    });
 }); 

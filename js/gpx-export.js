@@ -29,10 +29,10 @@ class GPXExport {
             startTime = new Date(`${runDate}T${runStartTime}`);
         }
 
-        let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-        gpx += `<gpx version="1.1" creator="Route Generator" xmlns="http:
-        gpx += `  <metadata>\n    <name>${runName}</name>\n    <desc>${runDesc}</desc>\n    <type>${activityType}</type>\n    <time>${startTime.toISOString()}</time>\n  </metadata>\n`;
-        gpx += `  <trk>\n    <name>${runName}</name>\n    <type>${activityType}</type>\n    <trkseg>\n`;
+        let gpx = `<?xml version="1.0" encoding="UTF-8"?>`;
+        gpx += `<gpx version="1.1" creator="Route Generator" xmlns="http://www.topografix.com/GPX/1/1">`;
+        gpx += `  <metadata>\n    <name>${runName}</name>\n    <desc>${runDesc}</desc>\n    <type>${activityType}</type>\n    <time>${startTime.toISOString()}</time>\n  </metadata>`;
+        gpx += `  <trk>\n    <name>${runName}</name>\n    <type>${activityType}</type>\n    <trkseg>`;
 
         for (let i = 0; i < coordinates.length; i++) {
             const [lat, lng] = coordinates[i];
@@ -41,18 +41,14 @@ class GPXExport {
             let extensions = '';
             
             if (includeHR) {
-                
                 const baseHR = activityType === 'Run' ? 150 : 130;
                 const hr = Math.round(baseHR + (Math.random() - 0.5) * 10);
-                extensions += `<extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${hr}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions>`;
+                extensions += `<extensions><gpxtpx:TrackPointExtension xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><gpxtpx:hr>${hr}</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions>`;
             }
             if (paceInconsistency && avgPace) {
-                
-                
-                
                 extensions += `<!-- pace: ${avgPace}, inconsistency: ${paceInconsistency}% -->`;
             }
-            gpx += `      <trkpt lat="${lat}" lon="${lng}">${ele}${time}${extensions}</trkpt>\n`;
+            gpx += `      <trkpt lat="${lat}" lon="${lng}">${ele}${time}${extensions}</trkpt>`;
         }
 
         gpx += `    </trkseg>\n  </trk>\n</gpx>`;
@@ -68,9 +64,9 @@ class GPXExport {
     async generateGPX(coordinates, metadata = {}) {
         const meta = { ...this.defaultMetadata, ...metadata };
         
-        let gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GPX Route Generator" xmlns="http:
-  <metadata>
+        let gpx = `<?xml version="1.0" encoding="UTF-8"?>`;
+        gpx += `<gpx version="1.1" creator="GPX Route Generator" xmlns="http://www.topografix.com/GPX/1/1">`;
+        gpx += `  <metadata>
     <name>${this.escapeXml(meta.name)}</name>
     <desc>${this.escapeXml(meta.description)}</desc>
     <author>
@@ -83,7 +79,6 @@ class GPXExport {
     <name>${this.escapeXml(meta.name)}</name>
     <desc>${this.escapeXml(meta.description)}</desc>`;
 
-        
         coordinates.forEach((coord, index) => {
             gpx += `
     <rtept lat="${coord[0]}" lon="${coord[1]}">
@@ -102,9 +97,9 @@ class GPXExport {
     async generateKML(coordinates, metadata = {}) {
         const meta = { ...this.defaultMetadata, ...metadata };
         
-        let kml = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http:
-  <Document>
+        let kml = `<?xml version="1.0" encoding="UTF-8"?>`;
+        kml += `<kml xmlns="http://www.opengis.net/kml/2.2">`;
+        kml += `  <Document>
     <name>${this.escapeXml(meta.name)}</name>
     <description>${this.escapeXml(meta.description)}</description>
     <Style id="routeStyle">
@@ -123,7 +118,6 @@ class GPXExport {
       <LineString>
         <coordinates>`;
 
-        
         coordinates.forEach(coord => {
             kml += `
           ${coord[1]},${coord[0]},0`;
@@ -143,16 +137,15 @@ class GPXExport {
     async generateTCX(coordinates, metadata = {}) {
         const meta = { ...this.defaultMetadata, ...metadata };
         
-        let tcx = `<?xml version="1.0" encoding="UTF-8"?>
-<TrainingCenterDatabase xmlns="http:
-  <Courses>
+        let tcx = `<?xml version="1.0" encoding="UTF-8"?>`;
+        tcx += `<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">`;
+        tcx += `  <Courses>
     <Course>
       <Name>${this.escapeXml(meta.name)}</Name>
       <Lap>
         <Track>
           <Trackpoint>`;
 
-        
         coordinates.forEach(coord => {
             tcx += `
             <Position>
@@ -200,9 +193,7 @@ class GPXExport {
 
     
     async generateFIT(coordinates, metadata = {}) {
-        
         const meta = { ...this.defaultMetadata, ...metadata };
-        
         
         return `# FIT file format (binary)
 # This is a placeholder for FIT file generation
@@ -243,10 +234,8 @@ Generated: ${meta.time}`;
             const prev = coordinates[i - 1];
             const curr = coordinates[i];
             
-            
             const distance = this.calculateDistance(prev, curr);
             totalDistance += distance;
-            
             
             const elevation = Math.random() * 10; 
             totalElevation += elevation;
@@ -274,7 +263,6 @@ Generated: ${meta.time}`;
 
     
     calculateAveragePace(distance) {
-        
         const paceMinutes = 5.5;
         return paceMinutes;
     }
@@ -292,7 +280,6 @@ Generated: ${meta.time}`;
     
     async generateRouteWithElevation(coordinates) {
         try {
-            
             const elevationData = await window.ElevationService.getElevationData(coordinates);
             
             if (elevationData) {
@@ -306,7 +293,6 @@ Generated: ${meta.time}`;
             console.warn('Failed to get elevation data:', error);
         }
 
-        
         return coordinates.map(coord => ({
             lat: coord[0],
             lng: coord[1],
@@ -373,4 +359,4 @@ Generated: ${meta.time}`;
 }
 
 
-window.GPXExport = new GPXExport(); 
+window.GPXExport = new GPXExport();
